@@ -4,67 +4,41 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { getStudents } from "@/lib/actions";
 
-const MOCK_STUDENTS = [
-  {
-    id: "1",
-    name: "TEST",
-    universities: ["慶應義塾大学 総合政策学部", "早稲田大学 経済学部"],
-    lastUpdated: "2026/01/28"
-  },
-  {
-    id: "2",
-    name: "山口佳祐",
-    universities: ["明治大学 心理学部 心理学科", "北里大学 医療衛生学部 健康科学科", "成城大学 経済学部"],
-    lastUpdated: "2026/04/21"
-  }
-];
+export default async function Dashboard() {
+  const students = await getStudents();
 
-export default function DashboardPage() {
   return (
-    <div className="relative min-h-[calc(100vh-100px)]">
-      {/* Search and Tabs */}
+    <div className="w-full animate-in fade-in duration-500">
       <div className="flex flex-col items-center justify-center gap-6 mb-12 mt-4">
         <div className="relative w-full max-w-lg">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
           <Input 
             className="w-full pl-12 h-12 rounded-full border-slate-200 shadow-sm bg-white"
             placeholder="名前、大学、タグで検索..." 
           />
         </div>
         
-        <Tabs defaultValue="current" className="w-auto">
-          <TabsList className="rounded-full bg-slate-100/80 p-1">
-            <TabsTrigger value="current" className="rounded-full px-6 text-sm data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
-              在籍生
-            </TabsTrigger>
-            <TabsTrigger value="graduated" className="rounded-full px-6 text-sm">
-              卒業生
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="rounded-full bg-slate-200/50 p-1 flex">
+          <button className="rounded-full px-8 py-2 text-sm bg-white text-indigo-600 shadow-sm font-semibold transition-all">在籍生</button>
+          <button className="rounded-full px-8 py-2 text-sm text-slate-500 font-semibold hover:text-slate-700 transition-all">卒業生</button>
+        </div>
       </div>
 
-      {/* Student Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {MOCK_STUDENTS.map(student => (
-          <Card key={student.id} className="p-6 hover:shadow-md transition-shadow bg-white rounded-xl border-slate-200 flex flex-col min-h-[220px]">
+        {students.map((student) => (
+          <Card key={student.id} className="p-6 flex flex-col hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold text-slate-800">{student.name}</h3>
-              <div className="flex gap-2">
-                <Link href={`/students/${student.id}`} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors">
-                  <ArrowRight className="h-5 w-5" />
-                </Link>
-                <button className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-slate-100 transition-colors">
-                  <Plus className="h-5 w-5" />
-                </button>
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
+                {student.initial}
               </div>
             </div>
-
             <div className="flex flex-wrap gap-2 mb-8 mt-2">
-              {student.universities.map(uni => (
-                <Badge key={uni} variant="secondary" className="bg-slate-100/80 text-slate-600 hover:bg-slate-200 font-normal py-1 px-3 text-xs border border-slate-200/60">
-                  {uni}
+              {student.universities.map((u, i) => (
+                <Badge key={i} variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200 py-1.5 px-3 font-medium">
+                  {u}
                 </Badge>
               ))}
             </div>

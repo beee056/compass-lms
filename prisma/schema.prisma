@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  students  StudentProfile[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  role      String   @default("MENTOR") // "STUDENT", "MENTOR", "ADMIN"
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudentProfile {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  phase       String   // e.g., "自己分析", "書類作成"
+  universities University[]
+  tasks       Task[]
+  milestones  Milestone[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model University {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  name             String
+  department       String
+  method           String   // e.g., "総合型選抜"
+}
+
+model Milestone {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  title            String
+  date             DateTime
+  status           String   // "TODO", "DONE"
+  type             String   // "書類提出", "面接"
+}
+
+model Task {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  title            String
+  dueDate          DateTime?
+  completed        Boolean  @default(false)
+  type             String   // "DOCUMENT", "TODO"
+  progress         Int      @default(0) // 0-100% for documents
+}

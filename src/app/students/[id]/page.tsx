@@ -29,7 +29,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
   }
 
   // DBから生徒情報を取得
-  let studentData = await prisma.studentProfile.findUnique({
+  const dbStudent = await prisma.studentProfile.findUnique({
     where: { id: params.id },
     include: {
       universities: true,
@@ -39,26 +39,24 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     }
   });
 
-  // DBに存在しない場合はモックを利用（開発中のフォールバック）
-  if (!studentData) {
-    if (params.id === "1") {
-      // @ts-ignore
-      studentData = MOCK_STUDENT;
-    } else {
-      notFound();
-    }
+  const isMock = !dbStudent && params.id === "1";
+  
+  if (!dbStudent && !isMock) {
+    notFound();
   }
 
   const student = {
-    id: studentData.id,
-    name: studentData.name,
-    initial: studentData.name.charAt(0),
-    phase: studentData.phase,
-    universities: studentData.universities?.map(u => `${u.name} ${u.department}`) || MOCK_STUDENT.universities,
-    driveUrl: studentData.driveFolderUrl || MOCK_STUDENT.driveUrl,
-    documents: studentData.documents || MOCK_STUDENT.documents,
-    tasks: studentData.tasks || [],
-    milestones: studentData.milestones || []
+    id: dbStudent ? dbStudent.id : MOCK_STUDENT.id,
+    name: dbStudent ? dbStudent.name : MOCK_STUDENT.name,
+    initial: dbStudent ? dbStudent.name.charAt(0) : MOCK_STUDENT.initial,
+    phase: dbStudent ? dbStudent.phase : MOCK_STUDENT.phase,
+    universities: dbStudent 
+      ? dbStudent.universities.map(u => `${u.name} ${u.department}`) 
+      : MOCK_STUDENT.universities,
+    driveUrl: dbStudent ? dbStudent.driveFolderUrl : MOCK_STUDENT.driveUrl,
+    documents: dbStudent ? dbStudent.documents : MOCK_STUDENT.documents,
+    tasks: dbStudent ? dbStudent.tasks : MOCK_STUDENT.tasks,
+    milestones: dbStudent ? dbStudent.milestones : MOCK_STUDENT.milestones
   };
 
   return (

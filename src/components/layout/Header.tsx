@@ -39,7 +39,7 @@ export default async function Header() {
                 <LayoutGrid className="h-5 w-5" />
               </button>
             </div>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </>
         ) : (
           <SignInButton mode="modal">

@@ -25,12 +25,14 @@ export default function AddStudentDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6 flex items-center gap-2 shadow-sm font-bold h-12">
-          <Plus className="h-5 w-5" />
-          生徒を追加
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6 flex items-center gap-2 shadow-sm font-bold h-12">
+            <Plus className="h-5 w-5" />
+            生徒を追加
+          </Button>
+        }
+      />
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">新規生徒の登録</DialogTitle>

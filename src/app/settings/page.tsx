@@ -1,9 +1,15 @@
-import { Settings, Users, Building, ShieldCheck } from "lucide-react";
+import { Settings, Users, Building, ShieldCheck, ListTodo } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export default function SettingsPage() {
+import { getTenant, updateTenantSettings, getTemplates } from "@/lib/actions";
+import TemplateManager from "@/components/TemplateManager";
+
+export default async function SettingsPage() {
+  const tenant = await getTenant();
+  const templates = await getTemplates();
+
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20">
       <div className="mb-8">
@@ -21,6 +27,10 @@ export default function SettingsPage() {
             組織プロフィール
           </button>
           <button className="w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-3">
+            <ListTodo className="h-5 w-5" />
+            タスクテンプレート
+          </button>
+          <button className="w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-3">
             <Users className="h-5 w-5" />
             メンター管理
           </button>
@@ -33,21 +43,26 @@ export default function SettingsPage() {
         <div className="md:col-span-2 space-y-6">
           <Card className="p-6 border-slate-200 shadow-sm bg-white">
             <h2 className="text-lg font-bold text-slate-800 mb-6">組織プロフィール</h2>
-            <div className="space-y-4">
+            <form action={updateTenantSettings} className="space-y-4">
               <div>
                 <label className="text-sm font-semibold text-slate-700 mb-1 block">塾名 / 組織名</label>
-                <Input defaultValue="Compass 予備校" className="border-slate-200 max-w-md" />
+                <Input name="name" defaultValue={tenant?.name || ""} required className="border-slate-200 max-w-md" />
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-700 mb-1 block">連携用 Google Drive 親フォルダID</label>
-                <Input defaultValue="1A2B3C4D5E6F7G8H9I" className="border-slate-200 max-w-md font-mono text-sm" />
-                <p className="text-xs text-slate-500 mt-1">生徒フォルダが自動生成される親フォルダのIDです。</p>
+                <Input name="driveId" defaultValue="1A2B3C4D5E6F7G8H9I" disabled className="border-slate-200 max-w-md font-mono text-sm" />
+                <p className="text-xs text-slate-500 mt-1">生徒フォルダが自動生成される親フォルダのIDです。（現在は固定）</p>
               </div>
-              <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6">
+              <Button type="submit" className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6">
                 保存する
               </Button>
-            </div>
+            </form>
           </Card>
+
+          {/* テンプレート管理 */}
+          <div id="templates">
+            <TemplateManager initialTemplates={templates as any[]} />
+          </div>
         </div>
       </div>
     </div>

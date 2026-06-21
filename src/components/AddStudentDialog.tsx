@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
+import { createStudent } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,11 +17,15 @@ export default function AddStudentDialog() {
     e.preventDefault();
     setIsPending(true);
     
-    // Server Actions（ダミー）を呼ぶ想定
-    setTimeout(() => {
-      setIsPending(false);
+    const formData = new FormData(e.currentTarget);
+    const result = await createStudent(formData);
+    
+    setIsPending(false);
+    if (result.success) {
       setOpen(false);
-    }, 1000);
+    } else {
+      alert(result.error);
+    }
   };
 
   return (
@@ -44,25 +49,56 @@ export default function AddStudentDialog() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name" className="text-slate-700 font-semibold text-sm">氏名</Label>
-              <Input id="name" placeholder="例: 山田 太郎" required className="border-slate-200" />
+              <Input id="name" name="name" placeholder="例: 山田 太郎" required className="border-slate-200" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="university" className="text-slate-700 font-semibold text-sm">第一志望校</Label>
-              <Input id="university" placeholder="例: 慶應義塾大学 総合政策学部" required className="border-slate-200" />
+              <Input id="university" name="university" placeholder="例: 慶應義塾大学 総合政策学部" required className="border-slate-200" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="highSchool" className="text-slate-700 font-semibold text-sm">出身高校 (任意)</Label>
+              <Input id="highSchool" name="highSchool" placeholder="例: 港区立青葉高校" className="border-slate-200" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="grade" className="text-slate-700 font-semibold text-sm">学年 (任意)</Label>
+              <Select defaultValue="高3" name="grade">
+                <SelectTrigger className="border-slate-200">
+                  <SelectValue placeholder="学年を選択" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="高3">高3</SelectItem>
+                  <SelectItem value="高2">高2</SelectItem>
+                  <SelectItem value="高1">高1</SelectItem>
+                  <SelectItem value="既卒">既卒</SelectItem>
+                  <SelectItem value="その他">その他</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="contactInfo" className="text-slate-700 font-semibold text-sm">本人・保護者の連絡先 (任意)</Label>
+              <Input id="contactInfo" name="contactInfo" placeholder="例: 090-0000-0000 / parent@example.com" className="border-slate-200" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="studentEmail" className="text-slate-700 font-semibold text-sm">生徒の招待用メールアドレス (生徒ポータル用・任意)</Label>
+              <Input id="studentEmail" name="studentEmail" type="email" placeholder="例: student@example.com" className="border-slate-200" />
+              <p className="text-xs text-slate-500">※生徒がこのアドレスでサインアップすると、自動的に紐付きます。</p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="phase" className="text-slate-700 font-semibold text-sm">現在のフェーズ</Label>
-              <Select defaultValue="自己分析">
-                <SelectTrigger className="border-slate-200">
-                  <SelectValue placeholder="フェーズを選択" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="自己分析">自己分析</SelectItem>
-                  <SelectItem value="書類作成">書類作成</SelectItem>
-                  <SelectItem value="面接対策">面接対策</SelectItem>
-                  <SelectItem value="直前期">直前期</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input 
+                id="phase" 
+                name="phase" 
+                defaultValue="自己分析" 
+                placeholder="フェーズを入力..." 
+                list="phase-options"
+                className="border-slate-200" 
+              />
+              <datalist id="phase-options">
+                <option value="自己分析" />
+                <option value="書類作成" />
+                <option value="面接対策" />
+                <option value="直前期" />
+              </datalist>
             </div>
           </div>
           <DialogFooter>

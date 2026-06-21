@@ -1,44 +1,60 @@
-import { UserPlus, FolderOpen, LayoutGrid, LogIn } from "lucide-react";
+import { LayoutGrid, Calendar, Settings, LogIn } from "lucide-react";
 import { UserButton, SignInButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/actions";
+import Link from "next/link";
 
 export default async function Header() {
   let userId = null;
+  let user = null;
+  
   try {
     const session = await auth();
     userId = session.userId;
+    if (userId) {
+      user = await getCurrentUser();
+    }
   } catch (e) {
     console.warn("Clerk auth not available yet", e);
   }
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-slate-200 px-6 bg-white shadow-sm">
-      <div className="flex items-center gap-3">
+      <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white font-bold">
           C
         </div>
         <span className="text-lg font-bold text-slate-800">スカラ・コンパス</span>
-      </div>
+      </Link>
 
       <div className="flex items-center gap-6">
         {userId ? (
           <>
-            <div className="flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5">
-              <span className="text-sm font-semibold text-indigo-600">TEST</span>
-              <span className="text-sm text-indigo-400">さんの指導</span>
-            </div>
+            {user?.role === "STUDENT" ? (
+              <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm">
+                <span className="text-sm font-bold text-emerald-700">{user.name}</span>
+                <span className="text-xs font-semibold text-emerald-500">さんのマイページ</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 border border-indigo-100 shadow-sm">
+                <span className="text-sm font-bold text-indigo-700">{user?.tenant?.name || `${user?.name}さんの指導`}</span>
+              </div>
+            )}
 
-            <div className="flex items-center gap-5 text-slate-500 mr-4">
-              <button className="hover:text-indigo-600 transition-colors">
-                <UserPlus className="h-5 w-5" />
-              </button>
-              <button className="hover:text-indigo-600 transition-colors">
-                <FolderOpen className="h-5 w-5" />
-              </button>
-              <button className="hover:text-indigo-600 transition-colors">
-                <LayoutGrid className="h-5 w-5" />
-              </button>
-            </div>
+            {/* ナビゲーションリンクの有効化 (メンターのみ) */}
+            {user?.role !== "STUDENT" && (
+              <div className="flex items-center gap-5 text-slate-500 mr-4">
+                <Link href="/" className="hover:text-indigo-600 transition-colors p-1" title="ダッシュボード">
+                  <LayoutGrid className="h-5 w-5" />
+                </Link>
+                <Link href="/schedule" className="hover:text-indigo-600 transition-colors p-1" title="スケジュール">
+                  <Calendar className="h-5 w-5" />
+                </Link>
+                <Link href="/settings" className="hover:text-indigo-600 transition-colors p-1" title="設定">
+                  <Settings className="h-5 w-5" />
+                </Link>
+              </div>
+            )}
             <UserButton />
           </>
         ) : (

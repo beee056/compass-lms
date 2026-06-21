@@ -16,8 +16,30 @@ const headingFont = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Compass LMS - Premium Student Management",
-  description: "Advanced learning management system for university admissions.",
+  title: "Scholor Compass | 総合型選抜指導管理システム",
+  description: "生徒の志望校、提出書類、面談タスクを統合管理する伴走型指導プラットフォーム",
+  openGraph: {
+    title: "Scholor Compass | 総合型選抜指導管理システム",
+    description: "生徒の志望校、提出書類、面談タスクを統合管理する伴走型指導プラットフォーム",
+    url: "https://compass-lms-5wkf.vercel.app",
+    siteName: "Scholor Compass",
+    images: [
+      {
+        url: "https://compass-lms-5wkf.vercel.app/ogp-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Scholor Compass - 総合型選抜指導管理システム"
+      }
+    ],
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Scholor Compass | 総合型選抜指導管理システム",
+    description: "生徒の志望校、提出書類、面談タスクを統合管理する伴走型指導プラットフォーム",
+    images: ["https://compass-lms-5wkf.vercel.app/ogp-image.png"],
+  }
 };
 
 export default function RootLayout({

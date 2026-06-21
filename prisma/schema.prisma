@@ -15,6 +15,8 @@ model Tenant {
   updatedAt DateTime         @updatedAt
   users     User[]
   students  StudentProfile[]
+  templates TaskTemplate[]
+  logs      ActivityLog[]
 }
 
 model User {
@@ -24,9 +26,10 @@ model User {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   role      String   @default("MENTOR") // "STUDENT", "MENTOR", "ADMIN"
   name      String
-  email     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  email          String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  studentProfile StudentProfile?
 }
 
 model StudentProfile {
@@ -37,10 +40,18 @@ model StudentProfile {
   phase          String // e.g., "自己分析", "書類作成"
   driveFolderId  String? // Google Drive連携用の生徒固有フォルダID
   driveFolderUrl String? // Google Driveフォルダへの直リンク
+  highSchool     String?      // 高校名
+  grade          String?      // 学年
+  contactInfo    String?      // 連絡先
+  studentEmail   String?      @unique // 生徒招待・ログイン用メアド
+  userId         String?      @unique // サインアップ後に紐づくUser ID
+  user           User?        @relation(fields: [userId], references: [id])
+  status         String       @default("ACTIVE") // "ACTIVE" (在籍生) / "ARCHIVED" (卒業生)
   universities   University[]
   tasks          Task[]
   milestones     Milestone[]
   documents      Document[]
+  logs           ActivityLog[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -57,7 +68,9 @@ model University {
 model Milestone {
   id               String         @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  universityId     String?
+  university       University?    @relation(fields: [universityId], references: [id], onDelete: Cascade)
   title            String
   date             DateTime
   status           String // "TODO", "DONE"
@@ -67,12 +80,56 @@ model Milestone {
 model Task {
   id               String         @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  universityId     String?
+  university       University?    @relation(fields: [universityId], references: [id], onDelete: Cascade)
   title            String
   dueDate          DateTime?
   completed        Boolean        @default(false)
   type             String // "DOCUMENT", "TODO"
   progress         Int            @default(0) // 0-100% for documents
+  isSelfCreated    Boolean        @default(false) // 生徒自身が作成したタスクかどうか
+  comments         TaskComment[]
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  content   String
+  authorId  String   // userId (メンターまたは生徒)
+  authorName String  // キャッシュ用（API呼び出しを減らすため）
+  createdAt DateTime @default(now())
+}
+
+model TaskTemplate {
+  id        String         @id @default(cuid())
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id])
+  name      String         // "早慶 総合型", "指定校推薦" など
+  items     TemplateItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model TemplateItem {
+  id             String       @id @default(cuid())
+  templateId     String
+  template       TaskTemplate @relation(fields: [templateId], references: [id])
+  title          String
+  type           String       // "TODO", "DOCUMENT"
+  daysOffset     Int          // 追加日からの相対日数（例: 7日後）
+}
+
+model ActivityLog {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  studentProfileId String?
+  studentProfile   StudentProfile? @relation(fields: [studentProfileId], references: [id])
+  action           String         // "TASK_COMPLETED", "DOCUMENT_ADDED", "COMMENT_ADDED"
+  details          String         // 内容の説明
+  createdAt        DateTime       @default(now())
 }
 
 model Document {
@@ -86,3 +143,4 @@ model Document {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 }
+

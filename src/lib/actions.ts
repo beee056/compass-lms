@@ -2,8 +2,11 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 import prisma from "./prisma";
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "./email";
+
+const generateId = (prefix: string) => `${prefix}_${randomUUID().replace(/-/g, '')}`;
 
 // 日付計算ヘルパー
 function getFutureDate(days: number): Date {
@@ -50,6 +53,7 @@ export async function getCurrentUser() {
           // 生徒として登録
           const newUser = await tx.user.create({
             data: {
+              id: generateId('usr'),
               clerkId: userId,
               tenantId: studentProfile.tenantId,
               role: "STUDENT",
@@ -68,6 +72,7 @@ export async function getCurrentUser() {
           // メンターとして新規テナント作成
           const tenant = await tx.tenant.create({
             data: {
+              id: generateId('tnt'),
               name: `${name}のワークスペース`
             }
           });
@@ -75,6 +80,7 @@ export async function getCurrentUser() {
           // ユーザーを作成
           return await tx.user.create({
             data: {
+              id: generateId('usr'),
               clerkId: userId,
               tenantId: tenant.id,
               role: "MENTOR",
@@ -122,7 +128,8 @@ export async function getStudents() {
       phase: s.phase,
       highSchool: s.highSchool || "",
       grade: s.grade || "",
-      contactInfo: s.contactInfo || "",
+      phone: s.phone || "",
+      parentEmail: s.parentEmail || "",
       studentEmail: s.studentEmail || "",
       status: s.status || "ACTIVE"
     }));
@@ -141,7 +148,8 @@ export async function createStudent(formData: FormData) {
     const phase = formData.get("phase") as string;
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
-    const contactInfo = formData.get("contactInfo") as string || null;
+    const phone = formData.get("phone") as string || null;
+    const parentEmail = formData.get("parentEmail") as string || null;
     const studentEmail = formData.get("studentEmail") as string || null;
 
     if (!name || !universityStr || !phase) {
@@ -154,18 +162,24 @@ export async function createStudent(formData: FormData) {
     const uniDept = parts.slice(1).join(" "); // "学部未定"という文字列を強制せず、空文字（または入力のまま）にする
     const actualDept = uniDept || "学部未定";
 
+    const newStudentId = generateId('stu');
+    const newUniId = generateId('uni');
+
     await prisma.studentProfile.create({
       data: {
+        id: newStudentId,
         name,
         phase,
         tenantId: user.tenantId,
         highSchool,
         grade,
-        contactInfo,
+        phone,
+        parentEmail,
         studentEmail,
         status: "ACTIVE",
         universities: {
           create: {
+            id: newUniId,
             name: uniName,
             department: actualDept,
             method: "総合型選抜"
@@ -174,12 +188,12 @@ export async function createStudent(formData: FormData) {
         // 志望校が決まった（＝生徒登録）時の自動テンプレートタスク (推奨期限を自動セット)
         tasks: {
           create: [
-            { title: "第一志望校のアドミッション・ポリシー確認", type: "TODO", dueDate: getFutureDate(3) },
-            { title: "自己推薦書の構成案作成", type: "DOCUMENT", dueDate: getFutureDate(7) },
-            { title: "活動報告書の整理と素材集め", type: "DOCUMENT", dueDate: getFutureDate(14) },
-            { title: "小論文の過去問（1回目）実施", type: "DOCUMENT", dueDate: getFutureDate(21) },
-            { title: "プレゼンテーション資料のアウトライン作成", type: "DOCUMENT", dueDate: getFutureDate(28) },
-            { title: "面接の想定質問集の作成", type: "DOCUMENT", dueDate: getFutureDate(35) }
+            { id: generateId('tsk'), universityId: newUniId, title: "第一志望校のアドミッション・ポリシー確認", type: "TODO", dueDate: getFutureDate(3) },
+            { id: generateId('tsk'), universityId: newUniId, title: "自己推薦書の構成案作成", type: "DOCUMENT", dueDate: getFutureDate(7) },
+            { id: generateId('tsk'), universityId: newUniId, title: "活動報告書の整理と素材集め", type: "DOCUMENT", dueDate: getFutureDate(14) },
+            { id: generateId('tsk'), universityId: newUniId, title: "小論文の過去問（1回目）実施", type: "DOCUMENT", dueDate: getFutureDate(21) },
+            { id: generateId('tsk'), universityId: newUniId, title: "プレゼンテーション資料のアウトライン作成", type: "DOCUMENT", dueDate: getFutureDate(28) },
+            { id: generateId('tsk'), universityId: newUniId, title: "面接の想定質問集の作成", type: "DOCUMENT", dueDate: getFutureDate(35) }
           ]
         }
       } as any
@@ -201,7 +215,8 @@ export async function updateStudent(studentId: string, formData: FormData) {
     const phase = formData.get("phase") as string;
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
-    const contactInfo = formData.get("contactInfo") as string || null;
+    const phone = formData.get("phone") as string || null;
+    const parentEmail = formData.get("parentEmail") as string || null;
     const studentEmail = formData.get("studentEmail") as string || null;
     const status = formData.get("status") as string || "ACTIVE";
 
@@ -216,7 +231,8 @@ export async function updateStudent(studentId: string, formData: FormData) {
         phase,
         highSchool,
         grade,
-        contactInfo,
+        phone,
+        parentEmail,
         studentEmail,
         status
       } as any
@@ -292,7 +308,7 @@ export async function getScheduleData() {
 }
 
 // タスク追加アクション
-export async function createTask(studentId: string, title: string, dueDateStr?: string, type: string = "TODO") {
+export async function createTask(studentId: string, title: string, dueDateStr?: string, type: string = "TODO", universityId?: string) {
   try {
     const user = await getCurrentUser();
 
@@ -305,7 +321,9 @@ export async function createTask(studentId: string, title: string, dueDateStr?: 
 
     const newTask = await prisma.task.create({
       data: {
+        id: generateId('tsk'),
         studentProfileId: studentId,
+        universityId: universityId || null,
         title,
         dueDate: adjustedDueDate,
         type,
@@ -391,13 +409,15 @@ export async function deleteTask(taskId: string) {
 }
 
 // マイルストーン作成アクション
-export async function createMilestone(studentId: string, title: string, dateStr: string, type: string) {
+export async function createMilestone(studentId: string, title: string, dateStr: string, type: string, universityId?: string) {
   try {
     await getCurrentUser();
 
     await prisma.milestone.create({
       data: {
+        id: generateId('mil'),
         studentProfileId: studentId,
+        universityId: universityId || null,
         title,
         date: new Date(dateStr),
         type,
@@ -459,6 +479,7 @@ export async function addUniversity(studentId: string, name: string, department:
 
     const newUni = await prisma.university.create({
       data: {
+        id: generateId('uni'),
         studentProfileId: studentId,
         name,
         department,
@@ -475,7 +496,9 @@ export async function addUniversity(studentId: string, name: string, department:
 
       if (template) {
         const tasksToCreate = template.items.map((item: any) => ({
+          id: generateId('tsk'),
           studentProfileId: studentId,
+          universityId: newUni.id,
           title: `【${name}】${item.title}`,
           type: item.type,
           dueDate: getFutureDate(item.daysOffset),
@@ -488,14 +511,18 @@ export async function addUniversity(studentId: string, name: string, department:
       await prisma.task.createMany({
         data: [
           {
+            id: generateId('tsk'),
             studentProfileId: studentId,
+            universityId: newUni.id,
             title: `【${name}】アドミッション・ポリシー確認と志望理由の整理`,
             type: "TODO",
             dueDate: getFutureDate(3),
             completed: false
           },
           {
+            id: generateId('tsk'),
             studentProfileId: studentId,
+            universityId: newUni.id,
             title: `【${name}】自己推薦書/志望理由書 構成案作成`,
             type: "DOCUMENT",
             dueDate: getFutureDate(7),
@@ -619,6 +646,7 @@ export async function addActivityLog(action: string, details: string, studentPro
     // @ts-ignore Prismaの型が更新されていない場合でも動くように
     await prisma.activityLog.create({
       data: {
+        id: generateId('log'),
         tenantId: user.tenantId,
         studentProfileId,
         action,
@@ -654,6 +682,7 @@ export async function addTaskComment(taskId: string, content: string) {
     // @ts-ignore
     const comment = await prisma.taskComment.create({
       data: {
+        id: generateId('com'),
         taskId,
         content,
         authorId: user.id,
@@ -696,10 +725,11 @@ export async function createTemplate(name: string, items: { title: string, type:
     // @ts-ignore
     const template = await prisma.taskTemplate.create({
       data: {
+        id: generateId('tpl'),
         tenantId: user.tenantId,
         name,
         items: {
-          create: items
+          create: items.map(item => ({ id: generateId('tpi'), ...item }))
         }
       }
     });
@@ -722,6 +752,7 @@ export async function createStudentTask(title: string, dueDateStr?: string) {
 
     const task = await prisma.task.create({
       data: {
+        id: generateId('tsk'),
         studentProfileId: user.studentProfile.id,
         title,
         dueDate,

@@ -42,7 +42,8 @@ model StudentProfile {
   driveFolderUrl String? // Google Driveフォルダへの直リンク
   highSchool     String?      // 高校名
   grade          String?      // 学年
-  contactInfo    String?      // 連絡先
+  phone          String?      // 生徒電話番号
+  parentEmail    String?      // 保護者メールアドレス
   studentEmail   String?      @unique // 生徒招待・ログイン用メアド
   userId         String?      @unique // サインアップ後に紐づくUser ID
   user           User?        @relation(fields: [userId], references: [id])

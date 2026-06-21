@@ -27,7 +27,9 @@ const MOCK_STUDENT = {
   milestones: [],
   highSchool: "港区立青葉高校",
   grade: "高3",
-  contactInfo: "090-0000-0000",
+  phone: "090-0000-0000",
+  parentEmail: "parent@example.com",
+  studentEmail: "student@example.com",
   status: "ACTIVE"
 };
 
@@ -75,7 +77,9 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     milestones: dbStudent ? dbStudent.milestones : MOCK_STUDENT.milestones,
     highSchool: sData ? (sData.highSchool || "") : MOCK_STUDENT.highSchool,
     grade: sData ? (sData.grade || "") : MOCK_STUDENT.grade,
-    contactInfo: sData ? (sData.contactInfo || "") : MOCK_STUDENT.contactInfo,
+    phone: sData ? (sData.phone || "") : MOCK_STUDENT.phone,
+    parentEmail: sData ? (sData.parentEmail || "") : MOCK_STUDENT.parentEmail,
+    studentEmail: sData ? (sData.studentEmail || "") : MOCK_STUDENT.studentEmail,
     status: sData ? (sData.status || "ACTIVE") : MOCK_STUDENT.status
   };
 
@@ -145,11 +149,11 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
                   <span>{student.highSchool} ({student.grade || "学年未設定"})</span>
                 </span>
               )}
-              {student.contactInfo && (
-                <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md">
-                  <Phone className="h-4 w-4 text-slate-400" />
-                  <span>{student.contactInfo}</span>
-                </span>
+              {(student.phone || student.parentEmail) && (
+                <div className="flex items-center gap-2 bg-slate-100/50 px-2.5 py-1 rounded-md">
+                  <Phone className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                  <span>{student.phone} {student.parentEmail && `/ ${student.parentEmail}`}</span>
+                </div>
               )}
             </div>
           </div>

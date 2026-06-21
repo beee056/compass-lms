@@ -40,7 +40,7 @@ export default async function StudentPortalPage() {
   const student = {
     id: dbStudent.id,
     name: dbStudent.name,
-    phase: dbStudent.phase,
+    phase: sData.phase,
     universities: dbStudent.universities,
     driveUrl: dbStudent.driveFolderUrl,
     documents: dbStudent.documents,
@@ -48,7 +48,9 @@ export default async function StudentPortalPage() {
     milestones: dbStudent.milestones,
     highSchool: sData.highSchool || "",
     grade: sData.grade || "",
-    contactInfo: sData.contactInfo || "",
+    phone: sData.phone || "",
+    parentEmail: sData.parentEmail || "",
+    studentEmail: sData.studentEmail || "",
     status: sData.status || "ACTIVE"
   };
 

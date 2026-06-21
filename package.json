@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma db push --accept-data-loss && next build",
+    "build": "node migrate.js && prisma generate && next build",
     "start": "next start",
     "lint": "eslint"
   },
@@ -22,6 +22,7 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.21.0",
     "next": "14.2.15",
+    "pg": "^8.22.0",
     "react": "18.3.1",
     "react-day-picker": "^10.0.1",
     "react-dom": "18.3.1",

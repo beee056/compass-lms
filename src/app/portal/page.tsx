@@ -48,7 +48,8 @@ export default async function StudentPortalPage() {
     milestones: dbStudent.milestones,
     highSchool: sData.highSchool || "",
     grade: sData.grade || "",
-    contactInfo: sData.contactInfo || "",
+    phone: sData.phone || "",
+    parentEmail: sData.parentEmail || "",
     status: sData.status || "ACTIVE"
   };
 

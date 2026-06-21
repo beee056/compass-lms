@@ -19,7 +19,8 @@ interface StudentData {
   phase: string;
   highSchool: string;
   grade: string;
-  contactInfo: string;
+  phone: string;
+  parentEmail: string;
   status: string;
 }
 

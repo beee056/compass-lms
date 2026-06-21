@@ -5,13 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getStudents } from "@/lib/actions";
+import AddStudentDialog from "@/components/AddStudentDialog";
 
 export default async function Dashboard() {
   const students = await getStudents();
 
   return (
     <div className="w-full animate-in fade-in duration-500">
-      <div className="flex flex-col items-center justify-center gap-6 mb-12 mt-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-12 mt-4">
         <div className="relative w-full max-w-lg">
           <Search className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
           <Input 
@@ -20,9 +21,12 @@ export default async function Dashboard() {
           />
         </div>
         
-        <div className="rounded-full bg-slate-200/50 p-1 flex">
-          <button className="rounded-full px-8 py-2 text-sm bg-white text-indigo-600 shadow-sm font-semibold transition-all">在籍生</button>
-          <button className="rounded-full px-8 py-2 text-sm text-slate-500 font-semibold hover:text-slate-700 transition-all">卒業生</button>
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <div className="rounded-full bg-slate-200/50 p-1 flex">
+            <button className="rounded-full px-6 py-2 text-sm bg-white text-indigo-600 shadow-sm font-semibold transition-all">在籍生</button>
+            <button className="rounded-full px-6 py-2 text-sm text-slate-500 font-semibold hover:text-slate-700 transition-all">卒業生</button>
+          </div>
+          <AddStudentDialog />
         </div>
       </div>
 

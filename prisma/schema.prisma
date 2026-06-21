@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Tenant {
-  id        String           @id
+  id        String           @id @default(cuid())
   name      String
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
@@ -20,7 +20,7 @@ model Tenant {
 }
 
 model User {
-  id        String   @id
+  id        String   @id @default(cuid())
   clerkId   String   @unique
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
@@ -33,7 +33,7 @@ model User {
 }
 
 model StudentProfile {
-  id             String       @id
+  id             String       @id @default(cuid())
   tenantId       String
   tenant         Tenant       @relation(fields: [tenantId], references: [id])
   name           String
@@ -42,8 +42,7 @@ model StudentProfile {
   driveFolderUrl String? // Google Driveフォルダへの直リンク
   highSchool     String?      // 高校名
   grade          String?      // 学年
-  phone          String?      // 生徒電話番号
-  parentEmail    String?      // 保護者メールアドレス
+  contactInfo    String?      // 連絡先
   studentEmail   String?      @unique // 生徒招待・ログイン用メアド
   userId         String?      @unique // サインアップ後に紐づくUser ID
   user           User?        @relation(fields: [userId], references: [id])
@@ -58,18 +57,16 @@ model StudentProfile {
 }
 
 model University {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
   name             String
   department       String
   method           String // e.g., "総合型選抜"
-  tasks            Task[]
-  milestones       Milestone[]
 }
 
 model Milestone {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   universityId     String?
@@ -81,7 +78,7 @@ model Milestone {
 }
 
 model Task {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   universityId     String?
@@ -96,7 +93,7 @@ model Task {
 }
 
 model TaskComment {
-  id        String   @id
+  id        String   @id @default(cuid())
   taskId    String
   task      Task     @relation(fields: [taskId], references: [id])
   content   String
@@ -106,7 +103,7 @@ model TaskComment {
 }
 
 model TaskTemplate {
-  id        String         @id
+  id        String         @id @default(cuid())
   tenantId  String
   tenant    Tenant         @relation(fields: [tenantId], references: [id])
   name      String         // "早慶 総合型", "指定校推薦" など
@@ -116,7 +113,7 @@ model TaskTemplate {
 }
 
 model TemplateItem {
-  id             String       @id
+  id             String       @id @default(cuid())
   templateId     String
   template       TaskTemplate @relation(fields: [templateId], references: [id])
   title          String
@@ -125,7 +122,7 @@ model TemplateItem {
 }
 
 model ActivityLog {
-  id               String         @id
+  id               String         @id @default(cuid())
   tenantId         String
   tenant           Tenant         @relation(fields: [tenantId], references: [id])
   studentProfileId String?
@@ -136,7 +133,7 @@ model ActivityLog {
 }
 
 model Document {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
   title            String

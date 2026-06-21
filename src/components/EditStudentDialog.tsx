@@ -17,9 +17,7 @@ interface EditStudentDialogProps {
     phase: string;
     highSchool?: string;
     grade?: string;
-    phone?: string;
-    parentEmail?: string;
-    studentEmail?: string;
+    contactInfo?: string;
     status?: string;
   };
   trigger?: React.ReactNode;
@@ -106,12 +104,8 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="phone" className="text-slate-700 font-semibold text-sm">生徒の電話番号</Label>
-              <Input id="phone" name="phone" defaultValue={student.phone || ""} placeholder="例: 090-0000-0000" className="border-slate-200" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="parentEmail" className="text-slate-700 font-semibold text-sm">保護者のメールアドレス</Label>
-              <Input id="parentEmail" name="parentEmail" type="email" defaultValue={student.parentEmail || ""} placeholder="例: parent@example.com" className="border-slate-200" />
+              <Label htmlFor="contactInfo" className="text-slate-700 font-semibold text-sm">本人・保護者の連絡先</Label>
+              <Input id="contactInfo" name="contactInfo" defaultValue={student.contactInfo || ""} placeholder="例: 090-0000-0000 / parent@example.com" className="border-slate-200" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="studentEmail" className="text-slate-700 font-semibold text-sm">生徒の招待用メールアドレス (生徒ポータル用)</Label>

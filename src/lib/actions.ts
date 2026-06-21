@@ -151,7 +151,8 @@ export async function createStudent(formData: FormData) {
     // 大学名をパース (例: "慶應義塾大学 総合政策学部")
     const parts = universityStr.split(" ");
     const uniName = parts[0];
-    const uniDept = parts.slice(1).join(" ") || "学部未定";
+    const uniDept = parts.slice(1).join(" "); // "学部未定"という文字列を強制せず、空文字（または入力のまま）にする
+    const actualDept = uniDept || "学部未定";
 
     await prisma.studentProfile.create({
       data: {
@@ -166,7 +167,7 @@ export async function createStudent(formData: FormData) {
         universities: {
           create: {
             name: uniName,
-            department: uniDept,
+            department: actualDept,
             method: "総合型選抜"
           }
         },
@@ -561,10 +562,17 @@ export async function editUniversity(universityId: string, name: string, departm
     const replaceName = (title: string) => {
       // "慶應義塾大学" => "早稲田大学" など
       let newTitle = title.replace(oldName, name);
+      
+      // 旧学部名が指定されていて「学部未定」でなかった場合、それを新学部に置換
       if (oldDept && oldDept !== "学部未定") {
         newTitle = newTitle.replace(oldDept, department === "学部未定" ? "" : department);
+      } 
+      // 旧学部名が「学部未定」だった場合で、新しい学部名が設定された場合、大学名とセットになっている箇所に学部名を追加するなどのケアが必要だが、
+      // 単純な置換だと「慶應義塾大学」が「慶應義塾大学 環境情報学部」になるようにする
+      else if (oldDept === "学部未定" && department !== "学部未定") {
+        newTitle = newTitle.replace(name, `${name} ${department}`);
       }
-      return newTitle;
+      return newTitle.trim();
     };
 
     // タスクの名称を更新

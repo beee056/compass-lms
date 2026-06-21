@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+// @ts-ignore
 import "./globals.css";
 import Header from "@/components/layout/Header";
 

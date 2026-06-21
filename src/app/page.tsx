@@ -48,7 +48,7 @@ export default async function Dashboard() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mb-8">
-                {student.universities.map((u, i) => (
+                {student.universities.map((u: string, i: number) => (
                   <Badge key={i} variant="secondary" className="bg-slate-50 text-slate-600 py-1.5 px-3 font-medium border-slate-100">
                     {u}
                   </Badge>

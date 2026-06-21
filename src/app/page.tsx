@@ -6,6 +6,14 @@ import Link from "next/link";
 import { getStudents } from "@/lib/actions";
 import AddStudentDialog from "@/components/AddStudentDialog";
 
+interface StudentData {
+  id: string;
+  name: string;
+  universities: string[];
+  lastUpdated: string;
+  initial: string;
+}
+
 export default async function Dashboard() {
   const students = await getStudents();
 
@@ -30,7 +38,7 @@ export default async function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {students.map((student) => (
+        {students.map((student: StudentData) => (
           <Link href={`/students/${student.id}`} key={student.id} className="block group">
             <Card className="p-8 flex flex-col min-h-[220px] bg-white border-slate-200/60 shadow-sm group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group-hover:border-indigo-200 transition-all duration-300">
               <div className="flex justify-between items-start mb-6">

@@ -51,7 +51,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     initial: dbStudent ? dbStudent.name.charAt(0) : MOCK_STUDENT.initial,
     phase: dbStudent ? dbStudent.phase : MOCK_STUDENT.phase,
     universities: dbStudent 
-      ? dbStudent.universities.map(u => `${u.name} ${u.department}`) 
+      ? dbStudent.universities.map((u: any) => `${u.name} ${u.department}`) 
       : MOCK_STUDENT.universities,
     driveUrl: dbStudent ? dbStudent.driveFolderUrl : MOCK_STUDENT.driveUrl,
     documents: dbStudent ? dbStudent.documents : MOCK_STUDENT.documents,
@@ -73,7 +73,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
             </Badge>
           </h1>
           <div className="flex gap-3 mt-2.5">
-            {student.universities.map((u, i) => (
+            {student.universities.map((u: any, i: number) => (
               <span key={i} className="text-sm text-slate-500 font-semibold bg-slate-100/50 px-2.5 py-1 rounded-md">{u}</span>
             ))}
           </div>
@@ -102,12 +102,12 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
 
             <Card className="border-slate-200/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] overflow-hidden bg-white/80 backdrop-blur-sm">
               <div className="divide-y divide-slate-100">
-                {student.documents.filter(d => !d.isArchived).length === 0 ? (
+                {student.documents.filter((d: any) => !d.isArchived).length === 0 ? (
                   <div className="p-8 text-center text-slate-400 font-semibold text-sm">
                     ドキュメントがまだありません。
                   </div>
                 ) : (
-                  student.documents.filter(d => !d.isArchived).map(doc => (
+                  student.documents.filter((d: any) => !d.isArchived).map((doc: any) => (
                     <div key={doc.id} className="p-5 flex items-center justify-between hover:bg-slate-50/80 transition-colors group">
                       <div className="flex items-center gap-5">
                         <div className="p-3 bg-indigo-50/50 text-indigo-600 rounded-xl border border-indigo-100/50">
@@ -182,7 +182,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
                 {[
                   { date: '2026/09/01', title: '慶應SFC 出願開始', type: '出願', isActive: false },
                   { date: '2026/10/15', title: '早稲田 1次合格発表', type: '発表', isActive: true },
-                ].map((m, i) => (
+                ].map((m: any, i: number) => (
                   <div key={i} className={`relative pl-8 pb-8 ${i === 1 ? 'pb-2' : ''}`}>
                     {/* Compass node */}
                     <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center ${m.isActive ? 'bg-indigo-500 ring-4 ring-indigo-50' : 'bg-slate-300'}`}>

@@ -1,5 +1,6 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import prisma from "./prisma";
 
 // 仮のモックデータ（DB接続前用）
@@ -22,10 +23,29 @@ const MOCK_STUDENTS = [
 
 export async function getStudents() {
   try {
-    // DB接続を試行
+    // Vercel/Clerk ベストプラクティス: サーバーアクション内で認証状態を検証
+    const { userId } = await auth();
+    
+    // 未認証の場合はエラー（または空配列）
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // まず該当ユーザーを取得し、所属するTenantIDを取得
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+    });
+
+    // DB上でユーザーが未作成の場合（初期状態）はモックを返す
+    if (!user) {
+      return MOCK_STUDENTS;
+    }
+
+    // TenantIDに基づいて自塾の生徒のみを取得
     const students = await prisma.studentProfile.findMany({
+      where: { tenantId: user.tenantId },
       include: {
-        user: true,
+        universities: true,
       },
       orderBy: {
         updatedAt: 'desc'
@@ -36,14 +56,14 @@ export async function getStudents() {
     
     return students.map(s => ({
       id: s.id,
-      name: s.user.name || "名称未設定",
-      universities: [s.targetUniv], // 本来は複数持たせる設計に拡張可能
+      name: s.name,
+      universities: s.universities.map(u => `${u.name} ${u.department}`),
       lastUpdated: s.updatedAt.toISOString().split('T')[0],
-      initial: (s.user.name || "名").charAt(0)
+      initial: s.name.charAt(0)
     }));
   } catch (error) {
-    // DB接続エラー時（環境変数が未設定など）はモックを返す
-    console.warn("DB not connected, using mock data:", error);
+    console.warn("DB not connected or not authenticated, using mock data");
     return MOCK_STUDENTS;
   }
 }
+

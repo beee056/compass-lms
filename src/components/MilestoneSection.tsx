@@ -44,8 +44,7 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
     if (!title.trim() || !date) return;
 
     startTransition(async () => {
-      // NOTE: Here we would pass sendEmail to the server action if it was supported
-      const result = await createMilestone(studentId, title, date, type);
+      const result = await createMilestone(studentId, title, date, type, sendEmail);
       if (result.success) {
         setTitle("");
         setDate("");

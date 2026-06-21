@@ -31,9 +31,17 @@ export default async function Header() {
         {userId ? (
           <>
             {user?.role === "STUDENT" ? (
-              <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm">
-                <span className="text-sm font-bold text-emerald-700">{user.name}</span>
-                <span className="text-xs font-semibold text-emerald-500">さんのマイページ</span>
+              <div className="flex items-center gap-5 mr-4">
+                <Link href="/portal" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="ポータル">
+                  <LayoutGrid className="h-5 w-5" />
+                </Link>
+                <Link href="/portal/calendar" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="マイ・スケジュール">
+                  <Calendar className="h-5 w-5" />
+                </Link>
+                <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm ml-2">
+                  <span className="text-sm font-bold text-emerald-700">{user.name}</span>
+                  <span className="text-xs font-semibold text-emerald-500">さんのマイページ</span>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 border border-indigo-100 shadow-sm">

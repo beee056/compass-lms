@@ -310,7 +310,7 @@ export async function getScheduleData() {
 }
 
 // タスク追加アクション
-export async function createTask(studentId: string, title: string, dueDateStr?: string, type: string = "TODO") {
+export async function createTask(studentId: string, title: string, dueDateStr?: string, type: string = "TODO", sendEmailNotification: boolean = false) {
   try {
     const user = await getCurrentUser();
 
@@ -333,17 +333,19 @@ export async function createTask(studentId: string, title: string, dueDateStr?: 
     });
     
     // 生徒情報を取得してメールアドレスがあれば通知
-    const student = await prisma.studentProfile.findUnique({
-      where: { id: studentId },
-      include: { user: true }
-    });
-    
-    if (student?.user?.email) {
-      await sendEmail(
-        student.user.email,
-        `【Compass】新しいタスクが追加されました: ${title}`,
-        `${student.name} さん\n\n指導者から新しいタスク「${title}」が追加されました。\nCompassにログインして詳細を確認してください。\n期限: ${dueDateStr ? dueDateStr : 'なし'}`
-      );
+    if (sendEmailNotification) {
+      const student = await prisma.studentProfile.findUnique({
+        where: { id: studentId },
+        include: { user: true }
+      });
+      
+      if (student?.user?.email) {
+        await sendEmail(
+          student.user.email,
+          `【Compass】新しいタスクが追加されました: ${title}`,
+          `${student.name} さん\n\n指導者から新しいタスク「${title}」が追加されました。\nCompassにログインして詳細を確認してください。\n期限: ${dueDateStr ? dueDateStr : 'なし'}`
+        );
+      }
     }
 
     revalidatePath(`/students/${studentId}`);
@@ -410,7 +412,7 @@ export async function deleteTask(taskId: string) {
 }
 
 // マイルストーン作成アクション
-export async function createMilestone(studentId: string, title: string, dateStr: string, type: string) {
+export async function createMilestone(studentId: string, title: string, dateStr: string, type: string, sendEmailNotification: boolean = false) {
   try {
     await getCurrentUser();
 
@@ -426,17 +428,19 @@ export async function createMilestone(studentId: string, title: string, dateStr:
     });
 
     // 生徒情報を取得してメールアドレスがあれば通知
-    const student = await prisma.studentProfile.findUnique({
-      where: { id: studentId },
-      include: { user: true }
-    });
-    
-    if (student?.user?.email) {
-      await sendEmail(
-        student.user.email,
-        `【Compass】新しいマイルストーンが追加されました: ${title}`,
-        `${student.name} さん\n\n指導者から新しいマイルストーン「${title}」が追加されました。\nCompassにログインして詳細を確認してください。\n予定日: ${dateStr}`
-      );
+    if (sendEmailNotification) {
+      const student = await prisma.studentProfile.findUnique({
+        where: { id: studentId },
+        include: { user: true }
+      });
+      
+      if (student?.user?.email) {
+        await sendEmail(
+          student.user.email,
+          `【Compass】新しいマイルストーンが追加されました: ${title}`,
+          `${student.name} さん\n\n指導者から新しいマイルストーン「${title}」が追加されました。\nCompassにログインして詳細を確認してください。\n予定日: ${dateStr}`
+        );
+      }
     }
 
     revalidatePath(`/students/${studentId}`);

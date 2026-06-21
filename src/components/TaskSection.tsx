@@ -76,7 +76,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
       if (isStudent) {
         result = await createStudentTask(title, dueDate || undefined);
       } else {
-        result = await createTask(studentId, title, dueDate || undefined, "TODO");
+        result = await createTask(studentId, title, dueDate || undefined, "TODO", sendEmail);
       }
       
       if (result.success) {
@@ -121,7 +121,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2.5 tracking-tight">
           <CheckCircle2 className="h-6 w-6 text-emerald-500" />
           直近のタスク
@@ -194,6 +194,27 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* 進捗バー */}
+      {tasks.length > 0 && (
+        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-bold text-slate-700">全体進捗</span>
+            <span className="text-sm font-bold text-emerald-600">
+              {Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)}%
+            </span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div 
+              className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500 ease-out" 
+              style={{ width: `${(tasks.filter(t => t.completed).length / tasks.length) * 100}%` }}
+            ></div>
+          </div>
+          <div className="mt-2 text-xs text-slate-500 font-medium text-right">
+            {tasks.filter(t => t.completed).length} / {tasks.length} 完了
+          </div>
+        </div>
+      )}
       
       <div className="space-y-3">
         {tasks.length === 0 ? (

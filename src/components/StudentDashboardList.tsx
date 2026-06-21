@@ -121,8 +121,10 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                       </div>
                     )}
                   </div>
-                  
-                  <div className="absolute top-4 right-4 z-20">
+                  <div className="flex items-start gap-2 relative z-20">
+                    <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-bold text-base group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all">
+                      {student.initial}
+                    </div>
                     <EditStudentDialog 
                       student={student} 
                       trigger={
@@ -137,10 +139,6 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                         </button>
                       } 
                     />
-                  </div>
-                  
-                  <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all ml-auto mt-2 mr-2 relative z-10">
-                    {student.initial}
                   </div>
                 </div>
 

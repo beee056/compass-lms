@@ -68,12 +68,14 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
         {/* マイルストーン追加ダイアログ (生徒には非表示) */}
         {!isStudent && (
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold px-3 py-1.5 rounded-lg text-xs h-9 shrink-0">
-                <Plus className="h-4 w-4" />
-                日程を追加
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <Button size="sm" variant="outline" className="flex items-center gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold px-3 py-1.5 rounded-lg text-xs h-9">
+                  <Plus className="h-4 w-4" />
+                  予定を追加
+                </Button>
+              }
+            />
             <DialogContent className="sm:max-w-[425px] bg-white">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold text-slate-800">マイルストーンの追加</DialogTitle>

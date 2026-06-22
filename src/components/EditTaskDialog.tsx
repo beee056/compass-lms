@@ -42,15 +42,17 @@ export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ? (
-          trigger
-        ) : (
-          <button className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100" title="タスクを編集">
-            <Edit2 className="h-4 w-4" />
-          </button>
-        )}
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          trigger ? (
+            trigger
+          ) : (
+            <button className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100" title="タスクを編集">
+              <Edit2 className="h-4 w-4" />
+            </button>
+          ) as any
+        }
+      />
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">タスクの編集</DialogTitle>

@@ -62,16 +62,18 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ? (
-          trigger
-        ) : (
-          <Button variant="outline" className="flex items-center gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold px-4 py-2 rounded-lg text-sm shadow-sm h-10">
-            <Edit2 className="h-4 w-4" />
-            プロフィールを編集
-          </Button>
-        )}
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          trigger ? (
+            trigger
+          ) : (
+            <Button variant="outline" className="flex items-center gap-2 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold px-4 py-2 rounded-lg text-sm shadow-sm h-10">
+              <Edit2 className="h-4 w-4" />
+              プロフィールを編集
+            </Button>
+          ) as any
+        }
+      />
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">生徒プロフィールの編集</DialogTitle>

@@ -38,11 +38,13 @@ export default function EditUniversityDialog({ university }: EditUniversityDialo
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <div className="text-slate-400 hover:text-indigo-600 transition-colors ml-1.5 p-1 cursor-pointer bg-white rounded-full shadow-sm border border-slate-200" title="志望校を編集">
-          <Edit2 className="h-3.5 w-3.5" />
-        </div>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <div className="text-slate-400 hover:text-indigo-600 transition-colors ml-1.5 p-1 cursor-pointer bg-white rounded-full shadow-sm border border-slate-200" title="志望校を編集">
+            <Edit2 className="h-3.5 w-3.5" />
+          </div>
+        }
+      />
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">志望校の編集</DialogTitle>

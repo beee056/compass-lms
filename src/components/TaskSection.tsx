@@ -247,7 +247,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
                       {task.dueDate && (
                         <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50/70 px-2 py-0.5 rounded-sm inline-flex">
                           <Clock className="h-3 w-3" />
-                          <span>期限: {new Date(task.dueDate).toLocaleDateString()}</span>
+                          <span>期限: {new Date(task.dueDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</span>
                         </div>
                       )}
                       <button 
@@ -286,7 +286,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
                           <div className="flex justify-between items-center mb-1">
                             <span className="font-bold text-xs text-indigo-700">{comment.authorName}</span>
                             <span className="text-[10px] text-slate-400 font-medium">
-                              {new Date(comment.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {new Date(comment.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                           <p className="text-slate-700 text-sm whitespace-pre-wrap">{comment.content}</p>

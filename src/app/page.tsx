@@ -36,7 +36,7 @@ export default async function Dashboard() {
                 <div className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{t.title}</div>
                 <div className="flex items-center gap-1 mt-2 text-xs font-bold text-rose-600">
                   <Clock className="h-3 w-3" />
-                  {new Date(t.dueDate).toLocaleDateString()}
+                  {new Date(t.dueDate).toISOString().split('T')[0].replace(/-/g, '/')}
                 </div>
               </Link>
             ))}

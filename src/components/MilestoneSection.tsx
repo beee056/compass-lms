@@ -165,7 +165,7 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
                   </div>
                   
                   <div className={`text-xs font-bold mb-1 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`}>
-                    {new Date(m.date).toLocaleDateString()}
+                    {new Date(m.date).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                   </div>
                   <h4 className={`text-base font-bold tracking-tight ${isActive ? 'text-slate-800' : 'text-slate-600'}`}>{m.title}</h4>
                   <span className={`inline-block mt-1.5 text-[10px] px-2.5 py-0.5 rounded border font-bold ${isActive ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>{m.type}</span>

@@ -42,7 +42,7 @@ export default async function SchedulePage() {
                       <h4 className="text-sm font-bold text-rose-900 leading-tight">{t.title}</h4>
                       <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-rose-600">
                         <Clock className="h-3 w-3" />
-                        期限: {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : ""}
+                        期限: {t.dueDate ? new Date(t.dueDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : ""}
                       </div>
                       <div className="mt-2 text-xs text-rose-700 font-medium bg-rose-100/50 inline-block px-2 py-1 rounded truncate max-w-full">
                         {t.studentProfile?.name}

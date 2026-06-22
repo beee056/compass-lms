@@ -106,7 +106,7 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                       </span>
                       <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        更新: {new Date(doc.updatedAt).toLocaleDateString()}
+                        更新: {new Date(doc.updatedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                       </span>
                     </div>
                   </div>

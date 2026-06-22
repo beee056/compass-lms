@@ -44,7 +44,7 @@ export default function ActivityLogSection({ logs }: { logs: ActivityLog[] }) {
               <div>
                 <p className="text-slate-700 font-medium">{log.details}</p>
                 <span className="text-xs text-slate-400 font-medium">
-                  {new Date(log.createdAt).toLocaleString()}
+                  {new Date(log.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 </span>
               </div>
             </div>

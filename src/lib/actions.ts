@@ -414,7 +414,7 @@ export async function deleteTask(taskId: string) {
 // タスク編集アクション
 export async function updateTask(taskId: string, title: string, dueDateStr?: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser();
 
     // 日付を調整
     let adjustedDueDate = null;
@@ -451,7 +451,7 @@ export async function updateTask(taskId: string, title: string, dueDateStr?: str
 // ドキュメント名称変更アクション
 export async function renameDocument(documentId: string, title: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser();
 
     const doc = await prisma.document.findUnique({
       where: { id: documentId }

@@ -95,15 +95,16 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
           </div>
         ) : (
           filteredStudents.map((student) => (
-            <Link href={`/students/${student.id}`} key={student.id} className="block group">
+            <div key={student.id} className="block group relative">
               <Card className="p-8 flex flex-col min-h-[260px] bg-white border-slate-200/60 shadow-sm group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group-hover:border-indigo-200 transition-all duration-300 relative overflow-hidden">
+                <Link href={`/students/${student.id}`} className="absolute inset-0 z-0" aria-label={`${student.name}の詳細を見る`} />
                 {/* 装飾用の背景グラデーション効果 */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/10 rounded-full blur-2xl group-hover:bg-indigo-50/30 transition-colors pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/10 rounded-full blur-2xl group-hover:bg-indigo-50/30 transition-colors pointer-events-none z-0"></div>
 
-                <div className="flex justify-between items-start mb-4 relative z-10">
+                <div className="flex justify-between items-start mb-4 relative z-10 pointer-events-none">
                   <div className="pr-10">
                     <h3 className="text-2xl font-bold text-slate-800 group-hover:text-indigo-600 transition-colors tracking-tight flex items-center gap-2">
-                      <Link href={`/students/${student.id}`} className="hover:underline">
+                      <Link href={`/students/${student.id}`} className="hover:underline pointer-events-auto relative z-20">
                         {student.name}
                       </Link>
                       {student.grade && (
@@ -121,7 +122,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                       </div>
                     )}
                   </div>
-                  <div className="flex items-start gap-2 relative z-20">
+                  <div className="flex items-start gap-2 relative z-20 pointer-events-auto">
                     <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-bold text-base group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all">
                       {student.initial}
                     </div>
@@ -130,10 +131,6 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                       trigger={
                         <button 
                           className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus:outline-none"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
                         >
                           <MoreHorizontal className="h-5 w-5" />
                         </button>
@@ -143,7 +140,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                 </div>
 
                 {/* 志望大学 */}
-                <div className="flex flex-wrap gap-2 mb-6">
+                <div className="flex flex-wrap gap-2 mb-6 relative z-10 pointer-events-none">
                   {student.universities.map((u, i) => (
                     <Badge key={i} variant="secondary" className="bg-slate-50 text-slate-600 py-1.5 px-3 font-medium border-slate-100">
                       {u}
@@ -151,7 +148,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
+                <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50 relative z-10 pointer-events-none">
                   <span className="text-xs font-semibold px-3 py-1 bg-indigo-50/50 text-indigo-600 rounded-full border border-indigo-100/50">
                     {student.phase}
                   </span>
@@ -163,7 +160,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                   </div>
                 </div>
               </Card>
-            </Link>
+            </div>
           ))
         )}
       </div>

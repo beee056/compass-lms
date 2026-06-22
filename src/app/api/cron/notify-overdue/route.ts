@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 
@@ -9,7 +9,7 @@ import { sendEmail } from '@/lib/email';
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== \Bearer \\) {
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET || 'SECRET'}`) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -52,10 +52,10 @@ export async function GET(request: Request) {
 
     // メール送信
     for (const [email, data] of userTaskMap.entries()) {
-      const taskListStr = data.tasks.map((t: any) => \- \ (期限: \)\).join('\n');
+      const taskListStr = data.tasks.map((t: any) => `- ${t.title} (期限: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString('ja-JP') : '未定'})`).join('\n');
       
-      const subject = \【\】未完了のタスクがあります\;
-      const body = \\ さん\n\nお疲れ様です。以下のタスクの期限が超過しています。\n速やかに確認し、完了させてください。\n\n\\n\nCompassにログインして詳細を確認してください。\;
+      const subject = `【${data.tenantName}】未完了のタスクがあります`;
+      const body = `${data.studentName} さん\n\nお疲れ様です。以下のタスクの期限が超過しています。\n速やかに確認し、完了させてください。\n\n${taskListStr}\n\nCompassにログインして詳細を確認してください。`;
       
       await sendEmail(email, subject, body);
     }

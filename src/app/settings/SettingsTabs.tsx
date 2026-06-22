@@ -16,14 +16,14 @@ export default function SettingsTabs({ tenant, templates }: { tenant: any; templ
       <div className="md:col-span-1 space-y-2">
         <button 
           onClick={() => setActiveTab('profile')}
-          className={\w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 transition-colors \\}
+          className={`w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
         >
           <Building className="h-5 w-5" />
           組織プロフィール
         </button>
         <button 
           onClick={() => setActiveTab('templates')}
-          className={\w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 transition-colors \\}
+          className={`w-full text-left px-4 py-3 rounded-lg font-bold flex items-center gap-3 transition-colors ${activeTab === 'templates' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
         >
           <ListTodo className="h-5 w-5" />
           タスクテンプレート

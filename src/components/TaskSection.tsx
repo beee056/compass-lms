@@ -68,6 +68,9 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
     if (!result.success) {
       alert("タスクの削除に失敗しました: " + result.error);
       setTasks(originalTasks);
+    }
+  };
+
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;

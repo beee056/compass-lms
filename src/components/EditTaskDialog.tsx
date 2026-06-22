@@ -2,76 +2,83 @@
 
 import { useState, useTransition } from "react";
 import { Edit2, Loader2 } from "lucide-react";
-import { editUniversity } from "@/lib/actions";
+import { updateTask } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-interface EditUniversityDialogProps {
-  university: {
+interface EditTaskDialogProps {
+  task: {
     id: string;
-    name: string;
-    department: string;
+    title: string;
+    dueDate?: string | Date | null;
   };
+  trigger?: React.ReactNode;
 }
 
-export default function EditUniversityDialog({ university }: EditUniversityDialogProps) {
+export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [name, setName] = useState(university.name);
-  const [department, setDepartment] = useState(university.department);
+  const [title, setTitle] = useState(task.title);
+  
+  // yyyy-MM-dd に変換
+  const defaultDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "";
+  const [date, setDate] = useState(defaultDate);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !department.trim()) return;
+    if (!title.trim()) return;
 
     startTransition(async () => {
-      const result = await editUniversity(university.id, name, department);
+      const result = await updateTask(task.id, title, date || undefined);
       if (result.success) {
         setOpen(false);
       } else {
-        alert("志望校の更新に失敗しました: " + result.error);
+        alert("タスクの更新に失敗しました: " + result.error);
       }
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <div className="text-slate-400 hover:text-indigo-600 transition-colors ml-1.5 p-1 cursor-pointer bg-white rounded-full shadow-sm border border-slate-200" title="志望校を編集">
-          <Edit2 className="h-3.5 w-3.5" />
-        </div>
+      <DialogTrigger asChild>
+        {trigger ? (
+          trigger
+        ) : (
+          <button className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100" title="タスクを編集">
+            <Edit2 className="h-4 w-4" />
+          </button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-800">志望校の編集</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-slate-800">タスクの編集</DialogTitle>
           <DialogDescription className="text-slate-500 text-sm">
-            大学・学部名を変更すると、関連する自動生成タスクや書類の名称も自動的に新しい名称に更新されます。
+            タスクの内容や期日を変更します。
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="uniName" className="text-slate-700 font-semibold text-sm">大学名</Label>
+              <Label htmlFor="taskTitle" className="text-slate-700 font-semibold text-sm">タスク名</Label>
               <Input 
-                id="uniName" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                placeholder="例: 早稲田大学" 
+                id="taskTitle" 
+                value={title} 
+                onChange={(e) => setTitle(e.target.value)} 
+                placeholder="例: 自己推薦書 初稿" 
                 required 
                 className="border-slate-200" 
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="uniDept" className="text-slate-700 font-semibold text-sm">学部名</Label>
+              <Label htmlFor="taskDate" className="text-slate-700 font-semibold text-sm">期日 (任意)</Label>
               <Input 
-                id="uniDept" 
-                value={department} 
-                onChange={(e) => setDepartment(e.target.value)} 
-                placeholder="例: 政治経済学部 (未定の場合は「学部未定」)" 
-                required 
-                className="border-slate-200" 
+                id="taskDate" 
+                type="date"
+                value={date} 
+                onChange={(e) => setDate(e.target.value)} 
+                className="border-slate-200 text-slate-700" 
               />
             </div>
           </div>

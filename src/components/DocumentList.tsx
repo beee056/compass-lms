@@ -5,6 +5,7 @@ import { Folder, ExternalLink, FileText, Clock, Archive } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { archiveDocument } from "@/lib/actions";
 import CreateDocumentButton from "./CreateDocumentButton";
+import EditDocumentDialog from "./EditDocumentDialog";
 
 interface Document {
   id: string;
@@ -111,10 +112,11 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                   </div>
                 </div>
                 {!isStudent && (
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <EditDocumentDialog document={doc} />
                     <button 
                       onClick={() => handleArchive(doc.id)}
-                      className="p-2.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" 
+                      className="p-2.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors focus:opacity-100" 
                       title="アーカイブする"
                     >
                       <Archive className="h-4 w-4" />

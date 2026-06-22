@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CheckCircle2, Clock, Plus, Trash2, Loader2, MessageSquare, Send } from "lucide-react";
 import { createTask, toggleTaskCompletion, deleteTask, addTaskComment, createStudentTask } from "@/lib/actions";
+import EditTaskDialog from "./EditTaskDialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -260,13 +261,16 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
                   </div>
                 </div>
                 {!isStudent && (
-                  <button 
-                    onClick={() => handleDelete(task.id)}
-                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                    title="タスクを削除"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <EditTaskDialog task={task} />
+                    <button 
+                      onClick={() => handleDelete(task.id)}
+                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:opacity-100"
+                      title="タスクを削除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
 

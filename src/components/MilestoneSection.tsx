@@ -60,9 +60,9 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
   return (
     <section>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <h2 className="text-lg xl:text-xl font-bold text-slate-800 flex items-center gap-2.5 tracking-tight truncate">
+        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
           <CalendarIcon className="h-6 w-6 text-indigo-500 flex-shrink-0" />
-          Compass (マイルストーン)
+          スケジュール・マイルストーン
         </h2>
 
         {/* マイルストーン追加ダイアログ (生徒には非表示) */}

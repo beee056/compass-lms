@@ -411,6 +411,71 @@ export async function deleteTask(taskId: string) {
   }
 }
 
+// タスク編集アクション
+export async function updateTask(taskId: string, title: string, dueDateStr?: string) {
+  try {
+    const user = await getCurrentUser();
+
+    // 日付を調整
+    let adjustedDueDate = null;
+    if (dueDateStr) {
+      adjustedDueDate = new Date(dueDateStr);
+      adjustedDueDate.setHours(23, 59, 59, 999);
+    }
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId }
+    });
+
+    if (!task) throw new Error("Task not found");
+
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        title,
+        dueDate: adjustedDueDate
+      }
+    });
+
+    await addActivityLog("TASK_EDITED", `タスクの内容を「${title}」に変更しました`, task.studentProfileId);
+
+    revalidatePath(`/students/${task.studentProfileId}`);
+    revalidatePath("/schedule");
+    return { success: true, task: updatedTask };
+  } catch (error: any) {
+    console.error("Failed to update task:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ドキュメント名称変更アクション
+export async function renameDocument(documentId: string, title: string) {
+  try {
+    const user = await getCurrentUser();
+
+    const doc = await prisma.document.findUnique({
+      where: { id: documentId }
+    });
+
+    if (!doc) throw new Error("Document not found");
+
+    const oldTitle = doc.title;
+
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { title }
+    });
+
+    await addActivityLog("DOCUMENT_RENAMED", `書類の名称を「${oldTitle}」から「${title}」に変更しました`, doc.studentProfileId);
+
+    revalidatePath(`/students/${doc.studentProfileId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to rename document:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 // マイルストーン作成アクション
 export async function createMilestone(studentId: string, title: string, dateStr: string, type: string, sendEmailNotification: boolean = false) {
   try {

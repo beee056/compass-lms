@@ -1,4 +1,4 @@
-﻿import { CalendarIcon, Clock, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon, Clock, CheckCircle2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { getCurrentUser } from '@/lib/actions';
 import ScheduleCalendar from '@/components/ScheduleCalendar';
@@ -51,9 +51,9 @@ export default async function StudentCalendarPage() {
               tasks.slice(0, 10).map((t: any) => (
                 <Card key={t.id} className="p-4 border border-rose-200 bg-rose-50/50 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex gap-3 items-start">
-                    <button className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border border-rose-300 bg-white text-transparent flex items-center justify-center">
+                    <div className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border border-rose-300 bg-white text-transparent flex items-center justify-center">
                       <CheckCircle2 className="h-3 w-3" />
-                    </button>
+                    </div>
                     <div>
                       <h4 className="text-sm font-bold text-rose-900 leading-tight">{t.title}</h4>
                       <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-rose-600">

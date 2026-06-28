@@ -26,10 +26,23 @@ export async function getCurrentUser() {
   // 1. まず既存のユーザーを検索
   let user = await prisma.user.findUnique({
     where: { clerkId: userId },
-    include: { tenant: true }
+    include: { tenant: true, studentProfile: true }
   });
 
-  // 2. なければオンデマンドで自己修復（作成）
+  // 1.5 既存ユーザーがSTUDENTなのにプロフィールがない場合の自己修復（管理者が再作成したケースなど）
+  if (user && user.role === "STUDENT" && !user.studentProfile) {
+    const clerkUser = await currentUser();
+    const email = clerkUser?.emailAddresses[0]?.emailAddress;
+    if (email) {
+      const profile = await prisma.studentProfile.findUnique({ where: { studentEmail: email } });
+      if (profile && !profile.userId) {
+        await prisma.studentProfile.update({
+          where: { id: profile.id },
+          data: { userId: user.id }
+        });
+      }
+    }
+  }
   if (!user) {
     try {
       const clerkUser = await currentUser();

@@ -317,14 +317,24 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                   </Button>
                 </div>
 
-                {/* AI Feedback Panel */}
+                {/* AI Feedback Panel or Placeholder */}
                 <div className="flex-1 min-h-0 overflow-y-auto">
-                  {(feedbacks[currentStep.id] || isAiLoading) && (
+                  {feedbacks[currentStep.id] || isAiLoading ? (
                     <AiFeedbackPanel 
                       feedback={feedbacks[currentStep.id]?.content} 
                       score={feedbacks[currentStep.id]?.score}
                       isLoading={isAiLoading} 
                     />
+                  ) : (
+                    <div className="h-full bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 p-6 animate-in fade-in duration-500">
+                      <div className="bg-white p-4 rounded-full shadow-sm mb-4">
+                        <Sparkles size={32} className="text-indigo-200" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-500">AIからのフィードバックがここに表示されます</p>
+                      <p className="text-xs mt-2 text-slate-400 max-w-xs text-center">
+                        左の事例を参考に考えをまとめ、上のボタンからAIメンターに添削を依頼してください。
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>

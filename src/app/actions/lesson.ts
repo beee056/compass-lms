@@ -1,7 +1,5 @@
 "use server";
 
-export const maxDuration = 60; // Vercelのタイムアウト防止 (最大60秒)
-
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { generateAiFeedback } from "@/lib/gemini";

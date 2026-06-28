@@ -14,6 +14,8 @@ export type LessonStep = {
   title: string;
   description: string;
   prompt: string;
+  hint?: string | null;
+  placeholder?: string | null;
   order: number;
 };
 
@@ -105,6 +107,18 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
         </div>
       </div>
       
+      {/* Context Header (Pinned Theme) */}
+      <div className="bg-slate-800 text-slate-100 px-6 py-3 shadow-md z-20 flex items-start gap-3">
+        <div className="mt-1 flex-shrink-0">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-xs">
+            Q
+          </span>
+        </div>
+        <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap">
+          {lesson.content}
+        </div>
+      </div>
+      
       {/* Progress Line */}
       <div className="h-1 bg-slate-100 w-full">
         <motion.div 
@@ -142,7 +156,17 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                 </p>
               </div>
 
-              {/* ヒントやガイドをここに追加可能 */}
+              {currentStep.hint && (
+                <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-lg shadow-sm">
+                  <div className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4" />
+                    思考のヒント
+                  </div>
+                  <p className="text-sm text-amber-900 leading-relaxed">
+                    {currentStep.hint.replace("💡 ", "")}
+                  </p>
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -166,8 +190,8 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                 <Textarea 
                   value={currentAnswer}
                   onChange={(e) => setAnswers({...answers, [currentStep.id]: e.target.value})}
-                  placeholder="ここに文章を入力してください..."
-                  className="flex-1 min-h-[250px] resize-none text-base leading-relaxed p-4 bg-slate-50/50 border-slate-200 focus-visible:ring-indigo-500 shadow-inner"
+                  placeholder={currentStep.placeholder || "ここに文章を入力してください..."}
+                  className="flex-1 min-h-[250px] resize-none text-base leading-relaxed p-5 bg-white border border-slate-200 focus-visible:ring-indigo-500 shadow-inner placeholder:text-slate-300"
                 />
               </div>
 

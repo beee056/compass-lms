@@ -193,6 +193,8 @@ model LessonStep {
   title       String       
   description String       @db.Text 
   prompt      String       @db.Text 
+  hint        String?      @db.Text
+  placeholder String?      @db.Text
   order       Int          @default(0)
   isRequired  Boolean      @default(true)
   answers     StepAnswer[]

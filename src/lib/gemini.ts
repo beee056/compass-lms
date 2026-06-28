@@ -50,9 +50,17 @@ ${prompt}
     const responseText = result.response.text();
     const parsed = JSON.parse(responseText);
     
+    let score = null;
+    if (parsed.score !== undefined && parsed.score !== null) {
+      const parsedScore = parseInt(String(parsed.score), 10);
+      if (!isNaN(parsedScore)) {
+        score = parsedScore;
+      }
+    }
+    
     return {
-      content: parsed.content,
-      score: parsed.score
+      content: parsed.content || "フィードバックの生成に失敗しました。",
+      score: score
     };
   } catch (error) {
     console.error("Gemini API Error:", error);

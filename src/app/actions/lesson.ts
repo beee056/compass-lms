@@ -50,11 +50,12 @@ export async function submitStepAnswer(
 
     // 3. フィードバックをDBに保存 (studentProfileIdが存在する場合のみ)
     if (stepAnswerId) {
+      const sanitizedScore = (typeof aiResponse.score === 'number' && !isNaN(aiResponse.score)) ? aiResponse.score : null;
       await prisma.aIFeedback.create({
         data: {
           stepAnswerId,
           content: aiResponse.content,
-          score: aiResponse.score
+          score: sanitizedScore
         }
       });
     }

@@ -3,6 +3,7 @@ import CourseBrowser from "@/components/interactive-lms/CourseBrowser";
 import { getCurrentUser } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // サーバーアクションのタイムアウトを60秒に延長（Vercel用）
 
 export default async function MaterialsPage() {
   const user = await getCurrentUser();

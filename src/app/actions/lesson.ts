@@ -16,27 +16,25 @@ export async function submitStepAnswer(
   if (!userId) throw new Error("Unauthorized");
 
   try {
-    // 1. 解答を保存または更新
-    let stepAnswer = await prisma.stepAnswer.findFirst({
-      where: {
-        stepId,
-        studentProfileId
-      }
-    });
+    // 1. 解答を保存または更新 (studentProfileIdが存在する場合のみ)
+    let stepAnswerId = null;
+    
+    if (studentProfileId) {
+      let stepAnswer = await prisma.stepAnswer.findFirst({
+        where: { stepId, studentProfileId }
+      });
 
-    if (stepAnswer) {
-      stepAnswer = await prisma.stepAnswer.update({
-        where: { id: stepAnswer.id },
-        data: { content }
-      });
-    } else {
-      stepAnswer = await prisma.stepAnswer.create({
-        data: {
-          stepId,
-          studentProfileId,
-          content
-        }
-      });
+      if (stepAnswer) {
+        stepAnswer = await prisma.stepAnswer.update({
+          where: { id: stepAnswer.id },
+          data: { content }
+        });
+      } else {
+        stepAnswer = await prisma.stepAnswer.create({
+          data: { stepId, studentProfileId, content }
+        });
+      }
+      stepAnswerId = stepAnswer.id;
     }
 
     // 2. AIフィードバックを生成
@@ -48,14 +46,16 @@ export async function submitStepAnswer(
       aiResponse.content = "AIによる添削中にエラーが発生しました。時間を置いて再度お試しください。";
     }
 
-    // 3. フィードバックをDBに保存
-    const feedback = await prisma.aIFeedback.create({
-      data: {
-        stepAnswerId: stepAnswer.id,
-        content: aiResponse.content,
-        score: aiResponse.score
-      }
-    });
+    // 3. フィードバックをDBに保存 (studentProfileIdが存在する場合のみ)
+    if (stepAnswerId) {
+      await prisma.aIFeedback.create({
+        data: {
+          stepAnswerId,
+          content: aiResponse.content,
+          score: aiResponse.score
+        }
+      });
+    }
 
     // 4. キャッシュのパージ
     revalidatePath("/materials");
@@ -64,8 +64,8 @@ export async function submitStepAnswer(
     return {
       success: true,
       feedback: {
-        content: feedback.content,
-        score: feedback.score
+        content: aiResponse.content,
+        score: aiResponse.score
       }
     };
   } catch (error) {

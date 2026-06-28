@@ -12,10 +12,10 @@ export async function submitStepAnswer(
   content: string,
   prompt: string
 ) {
-  const { userId } = auth();
-  if (!userId) throw new Error("Unauthorized");
-
   try {
+    const { userId } = await auth();
+    if (!userId) throw new Error("Unauthorized");
+
     // 1. 解答を保存または更新 (studentProfileIdが存在する場合のみ)
     let stepAnswerId = null;
     

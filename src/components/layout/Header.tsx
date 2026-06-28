@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings, LogIn } from "lucide-react";
+import { LayoutGrid, Calendar, Settings, LogIn, BookOpen } from "lucide-react";
 import { UserButton, SignInButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { getCurrentUser } from "@/lib/actions";
@@ -38,6 +38,9 @@ export default async function Header() {
                 <Link href="/portal/calendar" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="マイ・スケジュール">
                   <Calendar className="h-5 w-5" />
                 </Link>
+                <Link href="/materials" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="学習資料・ガイダンス">
+                  <BookOpen className="h-5 w-5" />
+                </Link>
                 <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm ml-2">
                   <span className="text-sm font-bold text-emerald-700">{user.name}</span>
                   <span className="text-xs font-semibold text-emerald-500">さんのマイページ</span>
@@ -57,6 +60,9 @@ export default async function Header() {
                 </Link>
                 <Link href="/schedule" className="hover:text-indigo-600 transition-colors p-1" title="スケジュール">
                   <Calendar className="h-5 w-5" />
+                </Link>
+                <Link href="/materials" className="hover:text-indigo-600 transition-colors p-1" title="学習資料・ガイダンス">
+                  <BookOpen className="h-5 w-5" />
                 </Link>
                 <Link href="/settings" className="hover:text-indigo-600 transition-colors p-1" title="設定">
                   <Settings className="h-5 w-5" />

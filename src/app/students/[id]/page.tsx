@@ -11,6 +11,7 @@ import DocumentList from "@/components/DocumentList";
 import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
+import PracticeSection from "@/components/PracticeSection";
 
 // 仮データ（DB接続前用）
 const MOCK_STUDENT = {
@@ -38,6 +39,12 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     redirect("/portal");
   }
 
+  // 問題バンクの取得 (Client Componentへの受け渡しのためシリアライズ)
+  const rawQuestionBank = await prisma.questionBank.findMany({
+    orderBy: { createdAt: "desc" }
+  });
+  const questionBank = JSON.parse(JSON.stringify(rawQuestionBank));
+
   // DBから生徒情報を取得
   const dbStudent = await prisma.studentProfile.findUnique({
     where: { id: params.id },
@@ -48,7 +55,8 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         include: { comments: { orderBy: { createdAt: 'asc' } } },
         orderBy: { dueDate: 'asc' } 
       },
-      milestones: { orderBy: { date: 'asc' } }
+      milestones: { orderBy: { date: 'asc' } },
+      practiceRecords: { orderBy: { createdAt: 'desc' } }
     }
   });
 
@@ -74,6 +82,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     documents: dbStudent ? dbStudent.documents : MOCK_STUDENT.documents,
     tasks: dbStudent ? dbStudent.tasks : MOCK_STUDENT.tasks,
     milestones: dbStudent ? dbStudent.milestones : MOCK_STUDENT.milestones,
+    practiceRecords: dbStudent ? dbStudent.practiceRecords : [],
     highSchool: sData ? (sData.highSchool || "") : MOCK_STUDENT.highSchool,
     grade: sData ? (sData.grade || "") : MOCK_STUDENT.grade,
     phone: sData ? (sData.phone || "") : MOCK_STUDENT.phone,
@@ -86,7 +95,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     .filter((t: any) => !t.completed && t.dueDate)
     .map((t: any) => ({
       id: `task-${t.id}`,
-      title: `【タスク期限】${t.title}`,
+      title: t.title,
       date: new Date(t.dueDate),
       status: "TODO",
       type: "タスク期限"
@@ -103,8 +112,12 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     ...taskMilestones
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
+  // Client Componentへの受け渡しのためシリアライズ (Dateオブジェクト対策)
+  const safeStudent = JSON.parse(JSON.stringify(student));
+  const safeCombinedMilestones = JSON.parse(JSON.stringify(combinedMilestones));
+
   // flat strings for DocumentList prop
-  const flatUniversities = student.universities.map((u: any) => `${u.name} ${u.department}`);
+  const flatUniversities = safeStudent.universities.map((u: any) => `${u.name} ${u.department}`);
 
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20">
@@ -117,11 +130,11 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-4 tracking-tight">
-              {student.name}
+              {safeStudent.name}
               <Badge variant="outline" className="bg-indigo-50/50 text-indigo-600 border-indigo-200/60 px-3 py-1 font-semibold text-sm rounded-full">
-                {student.phase}
+                {safeStudent.phase}
               </Badge>
-              {student.status === "ARCHIVED" && (
+              {safeStudent.status === "ARCHIVED" && (
                 <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-300 px-3 py-1 font-semibold text-sm rounded-full">
                   卒業生
                 </Badge>
@@ -129,7 +142,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
             </h1>
             
             <div className="flex flex-wrap gap-3 mt-2.5 text-sm text-slate-500 items-center">
-              {student.universities.map((u: any, i: number) => (
+              {safeStudent.universities.map((u: any, i: number) => (
                 <span key={i} className="font-semibold bg-slate-100/50 px-2.5 py-1 rounded-md flex items-center">
                   {u.name} {u.department}
                   {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
@@ -139,30 +152,30 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
               ))}
               
               {/* 志望校追加ボタンの配置 */}
-              <AddUniversityDialog studentId={student.id} templates={templates as any[]} />
+              <AddUniversityDialog studentId={safeStudent.id} templates={templates as any[]} />
 
-              {student.highSchool && (
+              {safeStudent.highSchool && (
                  <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md ml-2">
                   <School className="h-4 w-4 text-slate-400" />
-                  <span>{student.highSchool} ({student.grade || "学年未設定"})</span>
+                  <span>{safeStudent.highSchool} ({safeStudent.grade || "学年未設定"})</span>
                 </span>
               )}
-              {student.phone && (
+              {safeStudent.phone && (
                 <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md">
                   <Phone className="h-4 w-4 text-slate-400" />
-                  <span>{student.phone}</span>
+                  <span>{safeStudent.phone}</span>
                 </span>
               )}
-              {student.parentEmail && (
+              {safeStudent.parentEmail && (
                 <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md">
                   <span className="text-slate-400 text-xs">@</span>
-                  <span>{student.parentEmail}</span>
+                  <span>{safeStudent.parentEmail}</span>
                 </span>
               )}
             </div>
           </div>
           <div>
-            <EditStudentDialog student={student} />
+            <EditStudentDialog student={safeStudent} />
           </div>
         </div>
       </div>
@@ -172,27 +185,35 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         <div className="xl:col-span-2 space-y-10">
           {/* Documents Section */}
           <DocumentList 
-            studentId={student.id} 
-            driveUrl={student.driveUrl} 
-            initialDocuments={student.documents as any[]} 
+            studentId={safeStudent.id} 
+            driveUrl={safeStudent.driveUrl} 
+            initialDocuments={safeStudent.documents as any[]} 
             universities={flatUniversities}
           />
 
           {/* Tasks Section */}
           <TaskSection 
-            studentId={student.id} 
-            initialTasks={student.tasks as any[]} 
+            studentId={safeStudent.id} 
+            initialTasks={safeStudent.tasks as any[]} 
+          />
+
+          {/* Practice Section */}
+          <PracticeSection 
+            studentId={safeStudent.id} 
+            initialRecords={safeStudent.practiceRecords as any[]} 
+            isMentorView={true}
+            questionBank={questionBank}
           />
         </div>
 
         {/* Compass Signature Milestone Column & Activity Log */}
         <div className="space-y-8">
           <MilestoneSection 
-            studentId={student.id} 
-            initialMilestones={combinedMilestones as any[]} 
+            studentId={safeStudent.id} 
+            initialMilestones={safeCombinedMilestones as any[]} 
           />
           
-          <ActivityLogSection logs={logs as any[]} />
+          <ActivityLogSection logs={JSON.parse(JSON.stringify(logs))} />
         </div>
       </div>
     </div>

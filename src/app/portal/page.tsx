@@ -7,9 +7,16 @@ import { School, Phone } from "lucide-react";
 import DocumentList from "@/components/DocumentList";
 import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
+import PracticeSection from "@/components/PracticeSection";
 
 export default async function StudentPortalPage() {
   const user = await getCurrentUser();
+
+  // 問題バンクの取得 (Client Componentへの受け渡しのためシリアライズ)
+  const rawQuestionBank = await prisma.questionBank.findMany({
+    orderBy: { createdAt: "desc" }
+  });
+  const questionBank = JSON.parse(JSON.stringify(rawQuestionBank));
 
   // MENTORが直接 /portal にアクセスした場合は弾く（もしくは自分担当の生徒一覧にリダイレクト）
   if (user.role !== "STUDENT") {
@@ -23,7 +30,8 @@ export default async function StudentPortalPage() {
       universities: true,
       documents: { orderBy: { updatedAt: 'desc' } },
       tasks: { orderBy: { dueDate: 'asc' } },
-      milestones: { orderBy: { date: 'asc' } }
+      milestones: { orderBy: { date: 'asc' } },
+      practiceRecords: { orderBy: { createdAt: 'desc' } }
     }
   });
 
@@ -46,6 +54,7 @@ export default async function StudentPortalPage() {
     documents: dbStudent.documents,
     tasks: dbStudent.tasks,
     milestones: dbStudent.milestones,
+    practiceRecords: dbStudent.practiceRecords,
     highSchool: sData.highSchool || "",
     grade: sData.grade || "",
     phone: sData.phone || "",
@@ -58,7 +67,7 @@ export default async function StudentPortalPage() {
     .filter((t: any) => !t.completed && t.dueDate)
     .map((t: any) => ({
       id: `task-${t.id}`,
-      title: `【タスク期限】${t.title}`,
+      title: t.title,
       date: new Date(t.dueDate),
       status: "TODO",
       type: "タスク期限"
@@ -75,8 +84,12 @@ export default async function StudentPortalPage() {
     ...taskMilestones
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
+  // Client Componentへの受け渡しのためシリアライズ (Dateオブジェクト対策)
+  const safeStudent = JSON.parse(JSON.stringify(student));
+  const safeCombinedMilestones = JSON.parse(JSON.stringify(combinedMilestones));
+
   // flat strings for DocumentList prop
-  const flatUniversities = student.universities.map((u: any) => `${u.name} ${u.department}`);
+  const flatUniversities = safeStudent.universities.map((u: any) => `${u.name} ${u.department}`);
 
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20 mt-4">
@@ -84,23 +97,23 @@ export default async function StudentPortalPage() {
       <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-4 tracking-tight">
-            {student.name} さんのマイページ
+            {safeStudent.name} さんのマイページ
             <Badge variant="outline" className="bg-indigo-50/50 text-indigo-600 border-indigo-200/60 px-3 py-1 font-semibold text-sm rounded-full">
-              {student.phase}
+              {safeStudent.phase}
             </Badge>
           </h1>
           
           <div className="flex flex-wrap gap-3 mt-2.5 text-sm text-slate-500 items-center">
-            {student.universities.map((u: any, i: number) => (
+            {safeStudent.universities.map((u: any, i: number) => (
               <span key={i} className="font-semibold bg-slate-100/50 px-2.5 py-1 rounded-md flex items-center">
                 {u.name} {u.department}
               </span>
             ))}
 
-            {student.highSchool && (
+            {safeStudent.highSchool && (
               <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md ml-2">
                 <School className="h-4 w-4 text-slate-400" />
-                <span>{student.highSchool} ({student.grade || "学年未設定"})</span>
+                <span>{safeStudent.highSchool} ({safeStudent.grade || "学年未設定"})</span>
               </span>
             )}
           </div>
@@ -112,26 +125,32 @@ export default async function StudentPortalPage() {
         <div className="xl:col-span-2 space-y-10">
           {/* Tasks Section */}
           <TaskSection 
-            studentId={student.id} 
-            initialTasks={student.tasks as any[]} 
+            studentId={safeStudent.id} 
+            initialTasks={safeStudent.tasks as any[]} 
             isStudent={true}
           />
 
           {/* Documents Section */}
           <DocumentList 
-            studentId={student.id} 
-            driveUrl={student.driveUrl} 
-            initialDocuments={student.documents as any[]} 
+            studentId={safeStudent.id} 
+            driveUrl={safeStudent.driveUrl} 
+            initialDocuments={safeStudent.documents as any[]} 
             universities={flatUniversities}
             isStudent={true}
+          />
+
+          <PracticeSection 
+            studentId={safeStudent.id} 
+            initialRecords={safeStudent.practiceRecords as any[]} 
+            questionBank={questionBank}
           />
         </div>
 
         {/* Compass Signature Milestone Column */}
         <div className="space-y-8">
           <MilestoneSection 
-            studentId={student.id} 
-            initialMilestones={combinedMilestones as any[]} 
+            studentId={safeStudent.id} 
+            initialMilestones={safeCombinedMilestones as any[]} 
             isStudent={true}
           />
         </div>

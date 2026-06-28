@@ -448,10 +448,16 @@ export async function updateTask(taskId: string, title: string, dueDateStr?: str
   }
 }
 
-// ドキュメント名称変更アクション
-export async function renameDocument(documentId: string, title: string) {
+// ドキュメント更新アクション
+export async function updateDocument(documentId: string, title: string, dueDateStr?: string | null) {
   try {
     await getCurrentUser();
+
+    let adjustedDueDate = null;
+    if (dueDateStr) {
+      adjustedDueDate = new Date(dueDateStr);
+      adjustedDueDate.setHours(23, 59, 59, 999);
+    }
 
     const doc = await prisma.document.findUnique({
       where: { id: documentId }
@@ -463,15 +469,20 @@ export async function renameDocument(documentId: string, title: string) {
 
     await prisma.document.update({
       where: { id: documentId },
-      data: { title }
+      data: { 
+        title,
+        dueDate: adjustedDueDate
+      }
     });
 
-    await addActivityLog("DOCUMENT_RENAMED", `書類の名称を「${oldTitle}」から「${title}」に変更しました`, doc.studentProfileId);
+    if (oldTitle !== title) {
+      await addActivityLog("DOCUMENT_UPDATED", `書類の名称を「${oldTitle}」から「${title}」に変更しました`, doc.studentProfileId);
+    }
 
     revalidatePath(`/students/${doc.studentProfileId}`);
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to rename document:", error);
+    console.error("Failed to update document:", error);
     return { success: false, error: error.message };
   }
 }

@@ -4,10 +4,16 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 
-export async function createStudentDocument(studentId: string, documentType: string, universityName?: string) {
+export async function createStudentDocument(studentId: string, documentType: string, universityName?: string, dueDateStr?: string | null) {
   try {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
+
+    let adjustedDueDate = null;
+    if (dueDateStr) {
+      adjustedDueDate = new Date(dueDateStr);
+      adjustedDueDate.setHours(23, 59, 59, 999);
+    }
 
     // GASのWebhook URLが環境変数にあるかチェック
     const webhookUrl = process.env.GAS_WEBHOOK_URL;
@@ -25,7 +31,8 @@ export async function createStudentDocument(studentId: string, documentType: str
           studentProfileId: studentId,
           title: `${mockTitle} (新規デモ)`,
           type: documentType,
-          url: "https://docs.google.com/document/d/dummy"
+          url: "https://docs.google.com/document/d/dummy",
+          dueDate: adjustedDueDate
         }
       });
       revalidatePath(`/students/${studentId}`);
@@ -69,7 +76,8 @@ export async function createStudentDocument(studentId: string, documentType: str
         studentProfileId: student.id,
         title: customTitle,
         type: documentType,
-        url: data.docUrl
+        url: data.docUrl,
+        dueDate: adjustedDueDate
       }
     });
 

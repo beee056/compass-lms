@@ -1,40 +1,39 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, FileText, Sparkles } from "lucide-react";
 import { createStudentDocument } from "@/lib/actions/drive";
+import { generateDocumentDraft } from "@/lib/actions/document";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function CreateDocumentButton({ studentId, universities }: { studentId: string; universities: string[] }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [mode, setMode] = useState<"docs" | "ai">("ai");
   const [docType, setDocType] = useState("自己推薦書");
   const [selectedUni, setSelectedUni] = useState("共通");
-
-  const handleTypeChange = (value: string | null) => {
-    if (value) {
-      setDocType(value);
-    }
-  };
-
-  const handleUniChange = (value: string | null) => {
-    if (value) {
-      setSelectedUni(value);
-    }
-  };
+  const [dueDate, setDueDate] = useState("");
+  const [keywords, setKeywords] = useState("");
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
 
     startTransition(async () => {
-      const result = await createStudentDocument(studentId, docType, selectedUni);
+      let result;
+      if (mode === "docs") {
+        result = await createStudentDocument(studentId, docType, selectedUni, dueDate || null);
+      } else {
+        result = await generateDocumentDraft(studentId, docType, selectedUni, keywords, dueDate || null);
+      }
       
       if (result.success) {
         setOpen(false);
+        setKeywords("");
       } else {
         alert(result.error);
       }
@@ -43,28 +42,51 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm">
-            <Plus className="h-4 w-4" />
-            新規書類を作成
-          </button>
-        }
-      />
-      <DialogContent className="sm:max-w-[425px] bg-white">
+      <DialogTrigger asChild>
+        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm">
+          <Plus className="h-4 w-4" />
+          新規書類を作成
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px] bg-white h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">新規ドキュメントの作成</DialogTitle>
           <DialogDescription className="text-slate-500 text-sm">
-            Google Drive上に新しく作成し、志望校と紐付けて連携します。
+            作成方法を選択してください。
           </DialogDescription>
         </DialogHeader>
+
+        {/* モード切替タブ */}
+        <div className="flex p-1 bg-slate-100 rounded-lg mb-4">
+          <button 
+            type="button"
+            onClick={() => setMode("ai")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-md transition-all ${
+              mode === "ai" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            アプリ内作成（AIアシスト）
+          </button>
+          <button 
+            type="button"
+            onClick={() => setMode("docs")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-md transition-all ${
+              mode === "docs" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            Google Docs（空ファイル）
+          </button>
+        </div>
+
         <form onSubmit={handleCreate}>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-2">
             {/* 関連志望校の選択 */}
             <div className="grid gap-2">
               <Label htmlFor="selectedUni" className="text-slate-700 font-semibold text-sm">対象の志望校</Label>
-              <Select value={selectedUni} onValueChange={handleUniChange}>
-                <SelectTrigger className="border-slate-200">
+              <Select value={selectedUni} onValueChange={(val) => setSelectedUni(val)}>
+                <SelectTrigger className="border-slate-200 bg-white">
                   <SelectValue placeholder="志望校を選択" />
                 </SelectTrigger>
                 <SelectContent className="bg-white">
@@ -96,13 +118,49 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
                 <option value="備忘メモ" />
               </datalist>
             </div>
+
+            {/* AIモード専用フィールド */}
+            {mode === "ai" && (
+              <div className="grid gap-2">
+                <Label htmlFor="keywords" className="text-slate-700 font-semibold text-sm">
+                  アピールポイント・構成案（AIドラフト作成用）
+                </Label>
+                <Textarea 
+                  id="keywords" 
+                  value={keywords} 
+                  onChange={(e) => setKeywords(e.target.value)} 
+                  placeholder="例：高校時代のボランティア経験、リーダーシップ、マーケティングへの興味など、書類に盛り込みたい要素を自由に入力してください。" 
+                  className="border-slate-200 min-h-[100px]" 
+                  required
+                />
+              </div>
+            )}
+
+            {/* 提出期限の選択 */}
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate" className="text-slate-700 font-semibold text-sm">提出期限 (任意)</Label>
+              <Input 
+                id="dueDate" 
+                type="date"
+                value={dueDate} 
+                onChange={(e) => setDueDate(e.target.value)} 
+                className="border-slate-200" 
+              />
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4 border-t border-slate-100 pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">
               キャンセル
             </Button>
-            <Button type="submit" disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold min-w-[100px]">
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "作成する"}
+            <Button type="submit" disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold min-w-[140px]">
+              {isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {mode === "ai" ? "AIで作成中..." : "作成中..."}
+                </>
+              ) : (
+                mode === "ai" ? "AIドラフトを作成" : "Google Docsを作成"
+              )}
             </Button>
           </DialogFooter>
         </form>

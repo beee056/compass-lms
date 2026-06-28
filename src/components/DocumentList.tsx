@@ -12,6 +12,9 @@ interface Document {
   title: string;
   url: string | null;
   type: string;
+  dueDate?: Date | null;
+  isInternal?: boolean;
+  content?: string | null;
   isArchived: boolean;
   updatedAt: Date;
 }
@@ -87,7 +90,15 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                     <FileText className="h-5 w-5" />
                   </div>
                   <div>
-                    {doc.url ? (
+                    {doc.isInternal ? (
+                      <a 
+                        href={isStudent ? `/portal/documents/${doc.id}` : `/students/${studentId}/documents/${doc.id}`} 
+                        className="font-bold text-slate-800 hover:text-indigo-600 transition-colors flex items-center gap-2 text-base"
+                      >
+                        {doc.title}
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-sm font-bold ml-1">アプリ内</span>
+                      </a>
+                    ) : doc.url ? (
                       <a 
                         href={doc.url} 
                         target="_blank" 
@@ -100,12 +111,17 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                     ) : (
                       <span className="font-bold text-slate-800 text-base">{doc.title}</span>
                     )}
-                    <div className="flex items-center gap-3 mt-1.5">
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       <span className="text-[11px] py-0.5 px-2 bg-slate-100/80 text-slate-500 font-bold rounded-sm border border-slate-200/50">
                         {doc.type}
                       </span>
+                      {doc.dueDate && (
+                        <span className="text-xs text-indigo-500 font-bold flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          期限: {new Date(doc.dueDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
                         更新: {new Date(doc.updatedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                       </span>
                     </div>

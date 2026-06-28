@@ -69,8 +69,15 @@ export async function submitStepAnswer(
         score: aiResponse.score
       }
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in submitStepAnswer:", error);
-    throw new Error("Failed to submit answer and generate feedback.");
+    // クライアントで詳細なエラー内容を把握できるように、throwせずにエラーメッセージを返す
+    return {
+      success: false,
+      feedback: {
+        content: `システムエラー詳細: ${error?.message || String(error)}`,
+        score: 0
+      }
+    };
   }
 }

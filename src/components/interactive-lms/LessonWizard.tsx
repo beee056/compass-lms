@@ -80,6 +80,14 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
             score: res.feedback.score || 0
           }
         });
+      } else if (res.feedback) {
+        setFeedbacks({
+          ...feedbacks,
+          [currentStep.id]: {
+            content: res.feedback.content,
+            score: 0
+          }
+        });
       }
     } catch (e) {
       console.error(e);

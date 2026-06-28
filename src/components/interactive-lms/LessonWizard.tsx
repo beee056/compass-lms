@@ -95,19 +95,33 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col h-[calc(100vh-120px)] bg-slate-50 rounded-xl overflow-hidden shadow-sm border border-slate-200/60">
-      {/* Header / Progress bar */}
-      <div className="bg-white px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
-        <h2 className="font-bold text-slate-800 flex items-center gap-2">
+      {/* Header / Clickable Stepper Navigation */}
+      <div className="bg-white px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10 overflow-x-auto">
+        <h2 className="font-bold text-slate-800 flex items-center gap-2 whitespace-nowrap mr-6">
           <span className="text-indigo-600">{lesson.title}</span>
         </h2>
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-          <span>{currentStepIndex + 1}</span>
-          <span className="text-slate-300">/</span>
-          <span>{lesson.steps.length}</span>
+        <div className="flex items-center gap-2 flex-1 max-w-2xl">
+          {lesson.steps.map((step, idx) => (
+            <div key={step.id} className="flex items-center flex-1">
+              <button
+                onClick={() => setCurrentStepIndex(idx)}
+                className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-all
+                  ${idx === currentStepIndex 
+                    ? "bg-indigo-600 text-white shadow-md ring-4 ring-indigo-100" 
+                    : answers[step.id] && answers[step.id].trim().length > 0
+                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+              >
+                {idx + 1}
+              </button>
+              {idx < lesson.steps.length - 1 && (
+                <div className={`flex-1 h-1 mx-1 rounded-full ${idx < currentStepIndex ? "bg-indigo-600" : "bg-slate-100"}`} />
+              )}
+            </div>
+          ))}
         </div>
       </div>
-      
-      {/* Context Header (Pinned Theme) */}
       <div className="bg-slate-800 text-slate-100 px-6 py-3 shadow-md z-20 flex items-start gap-3">
         <div className="mt-1 flex-shrink-0">
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-xs">
@@ -184,8 +198,14 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
             >
               <div className="flex-1 flex flex-col">
                 <label className="text-sm font-bold text-slate-700 mb-2 flex justify-between items-end">
-                  <span>あなたの思考を言語化する</span>
-                  <span className="text-xs text-slate-400 font-normal">{currentAnswer.length} 文字</span>
+                  <span>あなたの思考を言語化する (約100字〜150字)</span>
+                  <span className={`text-xs font-bold ${
+                    currentAnswer.length > 200 ? 'text-red-500' : 
+                    currentAnswer.length > 100 ? 'text-emerald-500' : 
+                    'text-slate-400'
+                  }`}>
+                    {currentAnswer.length} / 150 文字目安
+                  </span>
                 </label>
                 <Textarea 
                   value={currentAnswer}

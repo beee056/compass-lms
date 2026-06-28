@@ -19,7 +19,7 @@ export default async function Header() {
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-slate-200 px-6 bg-white shadow-sm">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-slate-200 px-6 bg-white shadow-sm">
       <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white font-bold">
           C

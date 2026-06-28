@@ -279,7 +279,7 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
               transition={{ duration: 0.3, delay: 0.1 }}
               className="flex-1 flex flex-col gap-6"
             >
-              <div className="flex-1 flex flex-col">
+              <div className="flex flex-col mb-4">
                 <label className="text-sm font-bold text-slate-700 mb-2 flex justify-between items-end">
                   <span>あなたの思考を言語化する (約100字〜150字)</span>
                   <span className={`text-xs font-bold ${
@@ -294,7 +294,7 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                   value={currentAnswer}
                   onChange={(e) => setAnswers({...answers, [currentStep.id]: e.target.value})}
                   placeholder={currentStep.placeholder || "ここに文章を入力してください..."}
-                  className="flex-1 min-h-[250px] resize-none text-base leading-relaxed p-5 bg-white border border-slate-200 focus-visible:ring-indigo-500 shadow-inner placeholder:text-slate-300"
+                  className="h-40 min-h-[160px] resize-none text-base leading-relaxed p-5 bg-white border border-slate-200 focus-visible:ring-indigo-500 shadow-inner placeholder:text-slate-300"
                 />
               </div>
 

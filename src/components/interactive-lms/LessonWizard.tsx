@@ -277,9 +277,9 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3, delay: 0.1 }}
-              className="flex-1 flex flex-col gap-6"
+              className="flex-1 flex flex-col gap-6 h-full"
             >
-              <div className="flex flex-col mb-4">
+              <div className="flex flex-col shrink-0">
                 <label className="text-sm font-bold text-slate-700 mb-2 flex justify-between items-end">
                   <span>あなたの思考を言語化する (約100字〜150字)</span>
                   <span className={`text-xs font-bold ${
@@ -299,8 +299,8 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
               </div>
 
               {/* AI Interaction Area */}
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-end">
+              <div className="flex-1 flex flex-col gap-4">
+                <div className="flex justify-end shrink-0">
                   <Button 
                     onClick={handleAiFeedbackRequest} 
                     disabled={isAiLoading || currentAnswer.trim().length < 10}
@@ -318,13 +318,15 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                 </div>
 
                 {/* AI Feedback Panel */}
-                {(feedbacks[currentStep.id] || isAiLoading) && (
-                  <AiFeedbackPanel 
-                    feedback={feedbacks[currentStep.id]?.content} 
-                    score={feedbacks[currentStep.id]?.score}
-                    isLoading={isAiLoading} 
-                  />
-                )}
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  {(feedbacks[currentStep.id] || isAiLoading) && (
+                    <AiFeedbackPanel 
+                      feedback={feedbacks[currentStep.id]?.content} 
+                      score={feedbacks[currentStep.id]?.score}
+                      isLoading={isAiLoading} 
+                    />
+                  )}
+                </div>
               </div>
             </motion.div>
           </AnimatePresence>

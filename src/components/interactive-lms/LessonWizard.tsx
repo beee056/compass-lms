@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, ChevronLeft, Check, Sparkles, Send } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check, Sparkles, Send, Map, ThumbsUp, ThumbsDown, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,10 @@ export type LessonStep = {
   prompt: string;
   hint?: string | null;
   placeholder?: string | null;
+  goodExample?: string | null;
+  goodReason?: string | null;
+  badExample?: string | null;
+  badReason?: string | null;
   order: number;
 };
 
@@ -23,6 +27,7 @@ export type LessonData = {
   id: string;
   title: string;
   content: string;
+  overview?: string | null;
   steps: LessonStep[];
 };
 
@@ -31,6 +36,7 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [feedbacks, setFeedbacks] = useState<Record<string, { content: string; score: number }>>({});
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [showMap, setShowMap] = useState(true);
 
   const currentStep = lesson.steps[currentStepIndex];
   const isLastStep = currentStepIndex === lesson.steps.length - 1;
@@ -121,7 +127,52 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
             </div>
           ))}
         </div>
+        <Button variant="outline" className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 ml-4 shrink-0" onClick={() => setShowMap(true)}>
+          <Map size={16} />
+          全体マップを見る
+        </Button>
       </div>
+
+      {/* Overview Map Modal / Overlay */}
+      <AnimatePresence>
+        {showMap && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-8"
+          >
+            <div className="bg-white rounded-2xl w-full max-w-4xl p-8 shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+              <h2 className="text-3xl font-extrabold text-slate-800 mb-2 flex items-center gap-3">
+                <Map className="text-indigo-600" size={32} />
+                これから構築する「志望理由」の全体像
+              </h2>
+              <p className="text-slate-500 mb-8 text-lg">{lesson.overview || "このステップを完了すると、論理的で説得力のある構造が完成します。"}</p>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                {lesson.steps.map((step, idx) => (
+                  <div key={idx} className={`p-4 rounded-xl border-2 ${idx === currentStepIndex ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 bg-white'}`}>
+                    <div className="text-xs font-bold text-indigo-500 mb-1">STEP {idx + 1}</div>
+                    <div className="font-bold text-slate-800 mb-2 text-sm">{step.title}</div>
+                    <div className="text-xs text-slate-500 line-clamp-2">{step.description}</div>
+                  </div>
+                ))}
+                <div className="p-4 rounded-xl border-2 border-emerald-500 bg-emerald-50 flex flex-col items-center justify-center text-center">
+                  <Check className="text-emerald-600 mb-2" size={32} />
+                  <div className="font-bold text-emerald-800 text-sm">完成！</div>
+                  <div className="text-xs text-emerald-600 mt-1">論理構造フレームワーク</div>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-12 text-lg shadow-lg" onClick={() => setShowMap(false)}>
+                  ワークを開始する <ArrowRight className="ml-2" />
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="bg-slate-800 text-slate-100 px-6 py-3 shadow-md z-20 flex items-start gap-3">
         <div className="mt-1 flex-shrink-0">
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-xs">
@@ -170,15 +221,47 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                 </p>
               </div>
 
-              {currentStep.hint && (
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-lg shadow-sm">
-                  <div className="text-sm font-bold text-amber-800 flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4" />
-                    思考のヒント
+              {currentStep.goodExample && (
+                <div className="mt-6 flex flex-col gap-4">
+                  <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                    <Sparkles className="text-amber-500" size={18} /> 思考のヒント（比較事例）
+                  </h4>
+                  
+                  {/* Good Example */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                    <div className="flex items-start gap-3">
+                      <div className="bg-emerald-100 p-2 rounded-full shrink-0">
+                        <ThumbsUp className="text-emerald-600" size={16} />
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-emerald-800 mb-1 text-sm">Good: 説得力のある回答例</h5>
+                        <p className="text-slate-700 text-sm mb-3">{currentStep.goodExample}</p>
+                        <div className="bg-white/60 p-3 rounded-lg text-xs text-emerald-900 border border-emerald-100">
+                          <span className="font-bold">なぜ良いのか？：</span> {currentStep.goodReason}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-amber-900 leading-relaxed">
-                    {currentStep.hint.replace("💡 ", "")}
-                  </p>
+
+                  {/* Bad Example */}
+                  {currentStep.badExample && (
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+                      <div className="flex items-start gap-3">
+                        <div className="bg-rose-100 p-2 rounded-full shrink-0">
+                          <ThumbsDown className="text-rose-600" size={16} />
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-rose-800 mb-1 text-sm">Bad: よくある失敗例</h5>
+                          <p className="text-slate-700 text-sm mb-3">{currentStep.badExample}</p>
+                          <div className="bg-white/60 p-3 rounded-lg text-xs text-rose-900 border border-rose-100">
+                            <span className="font-bold">なぜダメなのか？：</span> {currentStep.badReason}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>

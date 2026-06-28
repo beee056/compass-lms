@@ -180,6 +180,7 @@ model Lesson {
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   title       String
   content     String       @db.Text
+  overview    String?      @db.Text
   order       Int          @default(0)
   steps       LessonStep[]
   createdAt   DateTime     @default(now())
@@ -195,6 +196,10 @@ model LessonStep {
   prompt      String       @db.Text 
   hint        String?      @db.Text
   placeholder String?      @db.Text
+  goodExample String?      @db.Text
+  goodReason  String?      @db.Text
+  badExample  String?      @db.Text
+  badReason   String?      @db.Text
   order       Int          @default(0)
   isRequired  Boolean      @default(true)
   answers     StepAnswer[]

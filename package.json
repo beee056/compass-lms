@@ -55,5 +55,14 @@
     "prisma": "6.18.0",
     "tailwindcss": "^4.3.1",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "@vercel/node"
+    ]
   }
 }

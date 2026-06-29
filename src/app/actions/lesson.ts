@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { generateAiFeedback } from "@/lib/gemini";
 import { auth } from "@clerk/nextjs/server";
 
+export const maxDuration = 60; // サーバーアクションのタイムアウトを60秒に延長（Vercel用）
+
 // 生徒の解答を保存し、AIに添削を依頼するアクション
 export async function submitStepAnswer(
   stepId: string, 

@@ -10,8 +10,8 @@ export async function generateAiFeedback(prompt: string, studentAnswer: string) 
     throw new Error("Gemini API key is not configured.");
   }
 
-  // 最新の高速・高性能モデル「gemini-3.5-flash」を使用
-  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+  // 最新の高速モデル「gemini-1.5-flash」を使用
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const systemPrompt = `
 あなたは総合型選抜・学校推薦型選抜のプロフェッショナルなメンター（指導者）です。

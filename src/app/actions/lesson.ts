@@ -2,10 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { generateAiFeedback } from "@/lib/gemini";
 import { auth } from "@clerk/nextjs/server";
-
-export const maxDuration = 60; // サーバーアクションのタイムアウトを60秒に延長（Vercel用）
 
 // 生徒の解答を保存し、AIに添削を依頼するアクション
 export async function submitStepAnswer(
@@ -39,37 +36,12 @@ export async function submitStepAnswer(
       stepAnswerId = stepAnswer.id;
     }
 
-    // 2. AIフィードバックを生成
-    let aiResponse = { content: "AIの初期化に失敗しました", score: null as number | null };
-    try {
-      aiResponse = await generateAiFeedback(prompt, content);
-    } catch (e) {
-      console.error("AI Feedback Generation failed:", e);
-      aiResponse.content = "AIによる添削中にエラーが発生しました。時間を置いて再度お試しください。";
-    }
-
-    // 3. フィードバックをDBに保存 (studentProfileIdが存在する場合のみ)
-    if (stepAnswerId) {
-      const sanitizedScore = (typeof aiResponse.score === 'number' && !isNaN(aiResponse.score)) ? aiResponse.score : null;
-      await prisma.aIFeedback.create({
-        data: {
-          stepAnswerId,
-          content: aiResponse.content,
-          score: sanitizedScore
-        }
-      });
-    }
-
-    // 4. キャッシュのパージ
+    // 2. キャッシュのパージ
     revalidatePath("/materials");
     revalidatePath(`/students/${studentProfileId}`);
 
     return {
-      success: true,
-      feedback: {
-        content: aiResponse.content,
-        score: aiResponse.score
-      }
+      success: true
     };
   } catch (error: any) {
     console.error("Error in submitStepAnswer:", error);

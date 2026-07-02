@@ -6,7 +6,6 @@ import { ChevronRight, ChevronLeft, Check, Sparkles, Send, Map, ThumbsUp, Thumbs
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import AiFeedbackPanel from "./AiFeedbackPanel";
 import { submitStepAnswer } from "@/app/actions/lesson";
 
 export type LessonStep = {
@@ -34,8 +33,8 @@ export type LessonData = {
 export default function LessonWizard({ lesson, studentProfileId }: { lesson: LessonData, studentProfileId: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [feedbacks, setFeedbacks] = useState<Record<string, { content: string; score: number }>>({});
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedSteps, setSavedSteps] = useState<Record<string, boolean>>({});
   const [showMap, setShowMap] = useState(true);
 
   const currentStep = lesson.steps[currentStepIndex];
@@ -54,52 +53,29 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
     }
   };
 
-  const handleAiFeedbackRequest = async () => {
+  const handleSaveAnswer = async () => {
     if (!currentAnswer.trim()) return;
     
-    setIsAiLoading(true);
+    setIsSaving(true);
     try {
-      // 本来は studentProfileId を渡す必要があるが、
-      // 簡単のためLessonWizardの親から渡されるプロパティか、あるいは
-      // ServerAction側で auth() と連携して解決させるかが必要。
-      // ここでは仮の studentProfileId（テスト用）または undefined を渡す設計にするか
-      // LessonWizard に studentProfileId をpropsで持たせるように修正が必要。
-      
       const res = await submitStepAnswer(
         currentStep.id, 
-        studentProfileId, // ※後でPropsに追加
+        studentProfileId,
         currentAnswer, 
         currentStep.prompt
       );
       
-      if (res.success && res.feedback) {
-        setFeedbacks({
-          ...feedbacks,
-          [currentStep.id]: {
-            content: res.feedback.content,
-            score: res.feedback.score || 0
-          }
-        });
-      } else if (res.feedback) {
-        setFeedbacks({
-          ...feedbacks,
-          [currentStep.id]: {
-            content: res.feedback.content,
-            score: 0
-          }
+      if (res.success) {
+        setSavedSteps({
+          ...savedSteps,
+          [currentStep.id]: true
         });
       }
     } catch (e) {
       console.error(e);
-      setFeedbacks({
-        ...feedbacks,
-        [currentStep.id]: {
-          content: "エラーが発生しました。時間を置いて再度お試しください。",
-          score: 0
-        }
-      });
+      alert("保存中にエラーが発生しました。");
     } finally {
-      setIsAiLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -306,45 +282,59 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
                 />
               </div>
 
-              {/* AI Interaction Area */}
+              {/* Action Area */}
               <div className="flex-1 flex flex-col gap-4">
-                <div className="flex justify-end shrink-0">
-                  <Button 
-                    onClick={handleAiFeedbackRequest} 
-                    disabled={isAiLoading || currentAnswer.trim().length < 10}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-md rounded-full px-6"
-                  >
-                    {isAiLoading ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
-                        <Sparkles className="h-4 w-4" />
-                      </motion.div>
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    AIメンターに添削を依頼する
-                  </Button>
-                </div>
-
-                {/* AI Feedback Panel or Placeholder */}
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  {feedbacks[currentStep.id] || isAiLoading ? (
-                    <AiFeedbackPanel 
-                      feedback={feedbacks[currentStep.id]?.content} 
-                      score={feedbacks[currentStep.id]?.score}
-                      isLoading={isAiLoading} 
-                    />
-                  ) : (
-                    <div className="h-full bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 p-6 animate-in fade-in duration-500">
-                      <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                        <Sparkles size={32} className="text-indigo-200" />
-                      </div>
-                      <p className="text-sm font-bold text-slate-500">AIからのフィードバックがここに表示されます</p>
-                      <p className="text-xs mt-2 text-slate-400 max-w-xs text-center">
-                        左の事例を参考に考えをまとめ、上のボタンからAIメンターに添削を依頼してください。
-                      </p>
+                {!savedSteps[currentStep.id] ? (
+                  <div className="flex justify-end shrink-0 mt-4">
+                    <Button 
+                      onClick={handleSaveAnswer} 
+                      disabled={isSaving || currentAnswer.trim().length < 10}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-md rounded-full px-6"
+                    >
+                      {isSaving ? (
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
+                          <Check className="h-4 w-4" />
+                        </motion.div>
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      回答を保存して自己評価へ進む
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="h-full bg-emerald-50/50 rounded-xl border border-emerald-200 flex flex-col p-6 animate-in fade-in duration-500 overflow-y-auto">
+                    <div className="flex items-center gap-2 mb-4 text-emerald-800">
+                      <Check size={24} className="text-emerald-500" />
+                      <h4 className="font-bold text-lg">保存完了！自分の回答を振り返りましょう</h4>
                     </div>
-                  )}
-                </div>
+                    
+                    <p className="text-sm text-slate-700 mb-6">
+                      以下のチェックポイントと左側のGood/Bad事例を見比べて、自分の回答が要件を満たせているか確認してください。
+                    </p>
+
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-100 mb-6">
+                      <h5 className="font-bold text-slate-700 mb-3 text-sm">✅ セルフチェックリスト</h5>
+                      <ul className="space-y-3 text-sm text-slate-600">
+                        <li className="flex items-start gap-2">
+                          <input type="checkbox" className="mt-1 shrink-0 accent-emerald-500 w-4 h-4" />
+                          <span>問われている内容にまっすぐ答えているか？</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <input type="checkbox" className="mt-1 shrink-0 accent-emerald-500 w-4 h-4" />
+                          <span>具体例や自分の経験に基づいた説明になっているか？</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <input type="checkbox" className="mt-1 shrink-0 accent-emerald-500 w-4 h-4" />
+                          <span>文字数は適切か？（目安：100字〜150字程度）</span>
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div className="text-xs mt-auto text-slate-500 bg-emerald-100/50 p-3 rounded text-center">
+                      チェックが完了したら、「次のステップへ」進んでください。後から何度でも修正可能です。
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </AnimatePresence>
@@ -362,12 +352,19 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
             </Button>
             
             {!isLastStep ? (
-              <Button onClick={handleNext} className="gap-2 bg-slate-800 hover:bg-slate-900 text-white">
+              <Button 
+                onClick={handleNext} 
+                disabled={!savedSteps[currentStep.id]}
+                className="gap-2 bg-slate-800 hover:bg-slate-900 text-white disabled:opacity-50"
+              >
                 次のステップへ
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
+              <Button 
+                disabled={!savedSteps[currentStep.id]}
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md disabled:opacity-50"
+              >
                 <Check className="h-4 w-4" />
                 ワークシートを提出する
               </Button>

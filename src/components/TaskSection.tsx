@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { CheckCircle2, Clock, Plus, Trash2, Loader2, MessageSquare, Send } from "lucide-react";
@@ -51,7 +52,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
 
     const result = await toggleTaskCompletion(taskId);
     if (!result.success) {
-      alert("タスクの更新に失敗しました: " + result.error);
+      toast.error("タスクの更新に失敗しました: " + result.error);
       setTasks(prev => 
         prev.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t)
       );
@@ -66,7 +67,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
 
     const result = await deleteTask(taskId);
     if (!result.success) {
-      alert("タスクの削除に失敗しました: " + result.error);
+      toast.error("タスクの削除に失敗しました: " + result.error);
       setTasks(originalTasks);
     }
   };
@@ -84,12 +85,13 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
       }
       
       if (result.success) {
+        toast.success("タスクを追加しました");
         setTitle("");
         setDueDate("");
         setSendEmail(false);
         setOpen(false);
       } else {
-        alert("タスクの作成に失敗しました: " + result.error);
+        toast.error("タスクの作成に失敗しました: " + result.error);
       }
     });
   };
@@ -112,7 +114,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
         return t;
       }));
     } else {
-      alert("コメントの送信に失敗しました");
+      toast.error("コメントの送信に失敗しました");
     }
     setIsSubmittingComment(false);
   };

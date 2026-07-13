@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Plus, Trash2, Loader2, Save, FileText, CheckCircle2 } from "lucide-react";
@@ -38,18 +39,25 @@ export default function TemplateManager({ initialTemplates }: { initialTemplates
   };
 
   const handleSave = () => {
-    if (!name.trim()) return alert("テンプレート名を入力してください");
-    if (items.some(i => !i.title.trim())) return alert("すべてのタスクにタイトルを入力してください");
+    if (!name.trim()) {
+      toast.error("テンプレート名を入力してください");
+      return;
+    }
+    if (items.some(i => !i.title.trim())) {
+      toast.error("すべてのタスクにタイトルを入力してください");
+      return;
+    }
 
     startTransition(async () => {
       const result = await createTemplate(name, items);
       if (result.success) {
+        toast.success("テンプレートを保存しました");
         setTemplates([result.template, ...templates]);
         setIsCreating(false);
         setName("");
         setItems([{ title: "", type: "TODO", daysOffset: 7 }]);
       } else {
-        alert("保存に失敗しました: " + result.error);
+        toast.error("保存に失敗しました: " + result.error);
       }
     });
   };

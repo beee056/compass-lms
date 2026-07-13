@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Edit2, Loader2 } from "lucide-react";
@@ -30,9 +31,10 @@ export default function EditDocumentDialog({ document, trigger }: EditDocumentDi
     startTransition(async () => {
       const result = await updateDocument(document.id, title, dueDate || null);
       if (result.success) {
+        toast.success("書類を更新しました");
         setOpen(false);
       } else {
-        alert("書類の更新に失敗しました: " + result.error);
+        toast.error("書類の更新に失敗しました: " + result.error);
       }
     });
   };

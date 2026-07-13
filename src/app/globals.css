@@ -49,45 +49,45 @@
 }
 
 :root {
-  /* Premium Palette: White & Deep Slate */
-  --background: #F8FAFC;
-  --foreground: #0F172A;
+  /* Scholar Compass Palette: washi paper, ink, cedar, signal red, and admission blue */
+  --background: #F7F8F4;
+  --foreground: #17202A;
   
   --card: #FFFFFF;
-  --card-foreground: #0F172A;
+  --card-foreground: #17202A;
   
   --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
+  --popover-foreground: #17202A;
   
-  --primary: #4F46E5; /* Indigo 600 */
+  --primary: #3346A3;
   --primary-foreground: #FFFFFF;
   
-  --secondary: #F1F5F9; /* Slate 100 */
-  --secondary-foreground: #1E293B; /* Slate 800 */
+  --secondary: #EEF1EA;
+  --secondary-foreground: #17202A;
   
-  --muted: #F1F5F9;
-  --muted-foreground: #64748B; /* Slate 500 */
+  --muted: #EEF1EA;
+  --muted-foreground: #68737D;
   
-  --accent: #10B981; /* Emerald 500 */
+  --accent: #137A5B;
   --accent-foreground: #FFFFFF;
   
-  --destructive: #EF4444;
+  --destructive: #C63D35;
   --destructive-foreground: #FFFFFF;
   
-  --border: #E2E8F0;
-  --input: #E2E8F0;
-  --ring: #4F46E5;
+  --border: #D8DEE4;
+  --input: #D8DEE4;
+  --ring: #3346A3;
   
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 
   --sidebar: #FFFFFF;
-  --sidebar-foreground: #0F172A;
-  --sidebar-primary: #4F46E5;
+  --sidebar-foreground: #17202A;
+  --sidebar-primary: #3346A3;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F1F5F9;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #E2E8F0;
-  --sidebar-ring: #4F46E5;
+  --sidebar-accent: #EEF1EA;
+  --sidebar-accent-foreground: #17202A;
+  --sidebar-border: #D8DEE4;
+  --sidebar-ring: #3346A3;
 }
 
 @layer base {
@@ -99,6 +99,6 @@
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading), sans-serif;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
 }

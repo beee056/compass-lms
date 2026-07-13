@@ -8,20 +8,30 @@ import { sendEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      console.error('CRON_SECRET is not configured');
+      return new NextResponse('Server misconfiguration', { status: 500 });
+    }
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET || 'SECRET'}`) {
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // 「今日(JST)の始まり」をUTCの瞬間として算出する。
+    // Vercel実行環境はUTCのため、単純な setHours(0,0,0,0) だとJSTとの9時間ズレで
+    // 日付境界が最大9時間ずれてしまう。JST(UTC+9)基準の当日0時をUTC instantに変換する。
+    const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+    const shifted = new Date(Date.now() + JST_OFFSET_MS);
+    shifted.setUTCHours(0, 0, 0, 0);
+    const todayStartJst = new Date(shifted.getTime() - JST_OFFSET_MS);
 
-    // 期日超過で未完了のタスクを取得
+    // 期日超過(JSTで前日以前が期限)かつ未完了のタスクを取得
     const overdueTasks = await prisma.task.findMany({
       where: {
         completed: false,
         dueDate: {
-          lt: today
+          lt: todayStartJst
         }
       },
       include: {
@@ -63,7 +73,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, count: userTaskMap.size });
   } catch (error: any) {
     console.error('Failed to run cron job:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 }
 

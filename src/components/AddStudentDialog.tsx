@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
@@ -22,9 +23,10 @@ export default function AddStudentDialog() {
     
     setIsPending(false);
     if (result.success) {
+      toast.success("生徒を追加しました");
       setOpen(false);
     } else {
-      alert(result.error);
+      toast.error(result.error);
     }
   };
 

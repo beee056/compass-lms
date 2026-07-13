@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Calendar as CalendarIcon, Plus, Loader2 } from "lucide-react";
@@ -46,13 +47,14 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
     startTransition(async () => {
       const result = await createMilestone(studentId, title, date, type, sendEmail);
       if (result.success) {
+        toast.success("マイルストーンを追加しました");
         setTitle("");
         setDate("");
         setType("書類提出");
         setSendEmail(false);
         setOpen(false);
       } else {
-        alert("マイルストーンの追加に失敗しました: " + result.error);
+        toast.error("マイルストーンの追加に失敗しました: " + result.error);
       }
     });
   };

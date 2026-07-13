@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Edit2, Loader2 } from "lucide-react";
@@ -29,9 +30,10 @@ export default function EditUniversityDialog({ university }: EditUniversityDialo
     startTransition(async () => {
       const result = await editUniversity(university.id, name, department);
       if (result.success) {
+        toast.success("志望校を更新しました");
         setOpen(false);
       } else {
-        alert("志望校の更新に失敗しました: " + result.error);
+        toast.error("志望校の更新に失敗しました: " + result.error);
       }
     });
   };

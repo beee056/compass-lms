@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { ArrowLeft, Save, Loader2, FileText, CheckCircle2 } from "lucide-react";
@@ -27,7 +28,7 @@ export default function DocumentEditor({
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 3000);
       } else {
-        alert(result.error);
+        toast.error(result.error);
         setSaveStatus("idle");
       }
     });

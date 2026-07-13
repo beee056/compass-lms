@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Edit2, Loader2, Trash2 } from "lucide-react";
@@ -37,9 +38,10 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
     startUpdateTransition(async () => {
       const result = await updateStudent(student.id, formData);
       if (result.success) {
+        toast.success("プロフィールを更新しました");
         setOpen(false);
       } else {
-        alert(result.error);
+        toast.error(result.error);
       }
     });
   };
@@ -52,10 +54,11 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
     startDeleteTransition(async () => {
       const result = await deleteStudent(student.id);
       if (result.success) {
+        toast.success("生徒を削除しました");
         setOpen(false);
         router.push("/");
       } else {
-        alert("生徒の削除に失敗しました: " + result.error);
+        toast.error("生徒の削除に失敗しました: " + result.error);
       }
     });
   };

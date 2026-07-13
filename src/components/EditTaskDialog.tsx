@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Edit2, Loader2 } from "lucide-react";
@@ -33,9 +34,10 @@ export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
     startTransition(async () => {
       const result = await updateTask(task.id, title, date || undefined);
       if (result.success) {
+        toast.success("タスクを更新しました");
         setOpen(false);
       } else {
-        alert("タスクの更新に失敗しました: " + result.error);
+        toast.error("タスクの更新に失敗しました: " + result.error);
       }
     });
   };

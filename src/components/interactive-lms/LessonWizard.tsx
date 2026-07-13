@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -73,7 +74,7 @@ export default function LessonWizard({ lesson, studentProfileId }: { lesson: Les
       }
     } catch (e) {
       console.error(e);
-      alert("保存中にエラーが発生しました。");
+      toast.error("保存中にエラーが発生しました。");
     } finally {
       setIsSaving(false);
     }

@@ -13,26 +13,6 @@ import MilestoneSection from "@/components/MilestoneSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
 import PracticeSection from "@/components/PracticeSection";
 
-// 仮データ（DB接続前用）
-const MOCK_STUDENT = {
-  id: "1",
-  name: "TEST",
-  initial: "TE",
-  phase: "書類作成",
-  universities: ["慶應義塾大学 総合政策学部", "早稲田大学 経済学部"],
-  driveUrl: "https://drive.google.com/drive/folders/dummy",
-  documents: [
-    { id: "d1", title: "志望理由書_初稿", type: "志望理由書", url: "https://docs.google.com/document/d/dummy", status: "編集中", updatedAt: new Date(), isArchived: false }
-  ],
-  tasks: [],
-  milestones: [],
-  highSchool: "港区立青葉高校",
-  grade: "高3",
-  phone: "090-0000-0000",
-  parentEmail: "parent@example.com",
-  status: "ACTIVE"
-};
-
 export default async function StudentDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (user.role === "STUDENT") {
@@ -45,49 +25,44 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
   });
   const questionBank = JSON.parse(JSON.stringify(rawQuestionBank));
 
-  // DBから生徒情報を取得
-  const dbStudent = await prisma.studentProfile.findUnique({
-    where: { id: params.id },
+  // DBから生徒情報を取得（自テナントの生徒のみ閲覧可能）
+  const dbStudent = await prisma.studentProfile.findFirst({
+    where: { id: params.id, tenantId: user.tenantId },
     include: {
       universities: true,
       documents: { orderBy: { updatedAt: 'desc' } },
-      tasks: { 
+      tasks: {
         include: { comments: { orderBy: { createdAt: 'asc' } } },
-        orderBy: { dueDate: 'asc' } 
+        orderBy: { dueDate: 'asc' }
       },
       milestones: { orderBy: { date: 'asc' } },
       practiceRecords: { orderBy: { createdAt: 'desc' } }
     }
   });
 
-  const templates = await getTemplates();
-  const logs = await getActivityLogs(params.id);
-
-  const isMock = !dbStudent && params.id === "1";
-  
-  if (!dbStudent && !isMock) {
+  if (!dbStudent) {
     notFound();
   }
 
-  const sData = dbStudent as any;
+  const templates = await getTemplates();
+  const logs = await getActivityLogs(params.id);
+
   const student = {
-    id: dbStudent ? dbStudent.id : MOCK_STUDENT.id,
-    name: dbStudent ? dbStudent.name : MOCK_STUDENT.name,
-    initial: dbStudent ? dbStudent.name.charAt(0) : MOCK_STUDENT.initial,
-    phase: dbStudent ? dbStudent.phase : MOCK_STUDENT.phase,
-    universities: dbStudent 
-      ? dbStudent.universities 
-      : MOCK_STUDENT.universities.map((name, i) => ({ id: `mock-u-${i}`, name: name.split(" ")[0], department: name.split(" ")[1] || "学部未定" })),
-    driveUrl: dbStudent ? dbStudent.driveFolderUrl : MOCK_STUDENT.driveUrl,
-    documents: dbStudent ? dbStudent.documents : MOCK_STUDENT.documents,
-    tasks: dbStudent ? dbStudent.tasks : MOCK_STUDENT.tasks,
-    milestones: dbStudent ? dbStudent.milestones : MOCK_STUDENT.milestones,
-    practiceRecords: dbStudent ? dbStudent.practiceRecords : [],
-    highSchool: sData ? (sData.highSchool || "") : MOCK_STUDENT.highSchool,
-    grade: sData ? (sData.grade || "") : MOCK_STUDENT.grade,
-    phone: sData ? (sData.phone || "") : MOCK_STUDENT.phone,
-    parentEmail: sData ? (sData.parentEmail || "") : MOCK_STUDENT.parentEmail,
-    status: sData ? (sData.status || "ACTIVE") : MOCK_STUDENT.status
+    id: dbStudent.id,
+    name: dbStudent.name,
+    initial: dbStudent.name.charAt(0),
+    phase: dbStudent.phase,
+    universities: dbStudent.universities,
+    driveUrl: dbStudent.driveFolderUrl,
+    documents: dbStudent.documents,
+    tasks: dbStudent.tasks,
+    milestones: dbStudent.milestones,
+    practiceRecords: dbStudent.practiceRecords,
+    highSchool: dbStudent.highSchool || "",
+    grade: dbStudent.grade || "",
+    phone: dbStudent.phone || "",
+    parentEmail: dbStudent.parentEmail || "",
+    status: dbStudent.status || "ACTIVE"
   };
 
   // 期限が設定されている「未完了のタスク」をマイルストーン形式に自動変換してマージ

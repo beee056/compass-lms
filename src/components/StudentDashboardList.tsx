@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Search, GraduationCap, Phone, School, UserCheck } from "lucide-react";
+import { MoreHorizontal, Search, School } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import AddStudentDialog from "./AddStudentDialog";
 import EditStudentDialog from "./EditStudentDialog";
-import { MoreHorizontal } from "lucide-react";
 
 interface StudentData {
   id: string;
@@ -21,6 +20,7 @@ interface StudentData {
   grade: string;
   phone: string;
   parentEmail: string;
+  studentEmail?: string;
   status: string;
 }
 
@@ -48,11 +48,11 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
   return (
     <div className="w-full">
       {/* 検索・フィルターバー */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-16 mt-6">
+      <div className="mb-10 mt-2 flex flex-col items-center justify-between gap-4 md:flex-row">
         <div className="relative w-full max-w-lg">
-          <Search className="absolute left-5 top-4 h-5 w-5 text-slate-400" />
+          <Search className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
           <Input 
-            className="w-full pl-14 h-14 rounded-full border-slate-200/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] bg-white/80 backdrop-blur-sm text-base focus-visible:ring-indigo-500/30"
+            className="h-12 w-full rounded-md border-[#d8dee4] bg-[#fbfcf8] pl-12 text-base shadow-none focus-visible:ring-[#3346a3]/30"
             placeholder="生徒名、大学、高校、学年で検索..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -60,12 +60,12 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-          <div className="rounded-full bg-white border border-slate-200/60 p-1 flex shadow-sm w-full sm:w-auto justify-center">
+          <div className="flex w-full justify-center rounded-md border border-[#d8dee4] bg-[#fbfcf8] p-1 shadow-none sm:w-auto">
             <button 
               onClick={() => setStatusFilter("ACTIVE")}
-              className={`rounded-full px-6 py-2.5 text-sm font-bold transition-all w-1/2 sm:w-auto text-center ${
+              className={`w-1/2 rounded px-6 py-2.5 text-center text-sm font-bold transition-all sm:w-auto ${
                 statusFilter === "ACTIVE" 
-                  ? "bg-slate-50 text-indigo-700 shadow-sm" 
+                  ? "bg-white text-[#3346a3] shadow-sm" 
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -73,9 +73,9 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
             </button>
             <button 
               onClick={() => setStatusFilter("ARCHIVED")}
-              className={`rounded-full px-6 py-2.5 text-sm font-bold transition-all w-1/2 sm:w-auto text-center ${
+              className={`w-1/2 rounded px-6 py-2.5 text-center text-sm font-bold transition-all sm:w-auto ${
                 statusFilter === "ARCHIVED" 
-                  ? "bg-slate-50 text-indigo-700 shadow-sm" 
+                  ? "bg-white text-[#3346a3] shadow-sm" 
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -89,21 +89,19 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
       {/* 生徒一覧カードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredStudents.length === 0 ? (
-          <div className="col-span-full py-20 flex flex-col items-center justify-center text-slate-500 bg-white border border-slate-200/60 rounded-xl border-dashed">
+          <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed border-[#d8dee4] bg-[#fbfcf8] py-20 text-slate-500">
             <p className="font-semibold text-lg mb-2">該当する生徒が見つかりません</p>
             <p className="text-sm">条件を変えて検索するか、生徒を追加してください。</p>
           </div>
         ) : (
           filteredStudents.map((student) => (
             <div key={student.id} className="block group relative">
-              <Card className="p-8 flex flex-col min-h-[260px] bg-white border-slate-200/60 shadow-sm group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group-hover:border-indigo-200 transition-all duration-300 relative overflow-hidden">
+              <Card className="relative flex min-h-[260px] flex-col overflow-hidden border-[#d8dee4] bg-white p-8 shadow-sm transition-all duration-300 group-hover:border-[#3346a3]/40 group-hover:shadow-[0_8px_24px_rgba(23,32,42,0.06)]">
                 <Link href={`/students/${student.id}`} className="absolute inset-0 z-0" aria-label={`${student.name}の詳細を見る`} />
-                {/* 装飾用の背景グラデーション効果 */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/10 rounded-full blur-2xl group-hover:bg-indigo-50/30 transition-colors pointer-events-none z-0"></div>
 
                 <div className="flex justify-between items-start mb-4 relative z-10 pointer-events-none">
                   <div className="pr-10">
-                    <h3 className="text-2xl font-bold text-slate-800 group-hover:text-indigo-600 transition-colors tracking-tight flex items-center gap-2">
+                    <h3 className="flex items-center gap-2 text-2xl font-bold tracking-normal text-[#17202a] transition-colors group-hover:text-[#3346a3]">
                       <Link href={`/students/${student.id}`} className="hover:underline pointer-events-auto relative z-20">
                         {student.name}
                       </Link>
@@ -123,7 +121,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                     )}
                   </div>
                   <div className="flex items-start gap-2 relative z-20 pointer-events-auto">
-                    <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-bold text-base group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md border border-[#d8dee4] bg-[#fbfcf8] text-base font-bold text-slate-500 transition-all group-hover:border-[#3346a3]/30 group-hover:bg-[#eef1ea] group-hover:text-[#3346a3]">
                       {student.initial}
                     </div>
                     <EditStudentDialog 
@@ -149,7 +147,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                 </div>
 
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50 relative z-10 pointer-events-none">
-                  <span className="text-xs font-semibold px-3 py-1 bg-indigo-50/50 text-indigo-600 rounded-full border border-indigo-100/50">
+                  <span className="rounded-md border border-[#d8dee4] bg-[#eef1ea] px-3 py-1 text-xs font-semibold text-[#3346a3]">
                     {student.phase}
                   </span>
                   <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">

@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Plus, Loader2, FileText, Sparkles } from "lucide-react";
@@ -32,10 +33,11 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
       }
       
       if (result.success) {
+        toast.success("書類を作成しました");
         setOpen(false);
         setKeywords("");
       } else {
-        alert(result.error);
+        toast.error(result.error);
       }
     });
   };

@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState } from "react";
 import { Folder, ExternalLink, FileText, Clock, Archive } from "lucide-react";
@@ -39,7 +40,7 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
 
     const result = await archiveDocument(docId);
     if (!result.success) {
-      alert("書類のアーカイブに失敗しました: " + result.error);
+      toast.error("書類のアーカイブに失敗しました: " + result.error);
       setDocuments(originalDocs);
     }
   };

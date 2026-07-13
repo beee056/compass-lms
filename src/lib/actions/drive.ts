@@ -1,13 +1,15 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
+import { getCurrentUser } from "../actions";
+import { assertMentor, assertStudentAccess } from "../authz";
 
 export async function createStudentDocument(studentId: string, documentType: string, universityName?: string, dueDateStr?: string | null) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
 
     let adjustedDueDate = null;
     if (dueDateStr) {

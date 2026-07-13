@@ -1,10 +1,12 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import { getCurrentUser } from "../actions";
+import { assertMentor, assertStudentAccess, findAuthorizedDocument, toClientError } from "../authz";
 
 const documentDraftPrompt = `
 あなたは大学受験の総合型選抜（旧AO入試）の専門プロ指導者です。
@@ -20,10 +22,10 @@ const documentDraftPrompt = `
 
 export async function generateDocumentDraft(studentId: string, type: string, universityName: string, keywords: string, dueDateStr?: string | null) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
 
-    // 生徒情報を確認
     const student = await prisma.studentProfile.findUnique({
       where: { id: studentId }
     });
@@ -52,7 +54,7 @@ ${keywords}
       if (isNaN(parsedDueDate.getTime())) parsedDueDate = null;
     }
 
-    const docId = `doc-${Date.now()}`;
+    const docId = `doc-${randomUUID()}`;
     const newDoc = await prisma.document.create({
       data: {
         id: docId,
@@ -70,7 +72,7 @@ ${keywords}
     const tenantId = student.tenantId || "default_tenant";
     await prisma.activityLog.create({
       data: {
-        id: `log-${Date.now()}`,
+        id: `log-${randomUUID()}`,
         tenantId,
         studentProfileId: student.id,
         action: "DOCUMENT_ADDED",
@@ -84,14 +86,15 @@ ${keywords}
     return { success: true, documentId: newDoc.id };
   } catch (error: any) {
     console.error("AI Draft Generation failed:", error);
-    return { success: false, error: error.message || "初稿の生成に失敗しました" };
+    return { success: false, error: toClientError(error, "初稿の生成に失敗しました") };
   }
 }
 
 export async function updateDocumentContent(documentId: string, content: string) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const user = await getCurrentUser();
+    // 生徒は自分の書類のみ、メンターは自テナントの書類のみ編集可能
+    await findAuthorizedDocument(user, documentId);
 
     const updatedDoc = await prisma.document.update({
       where: { id: documentId },
@@ -105,6 +108,6 @@ export async function updateDocumentContent(documentId: string, content: string)
     return { success: true };
   } catch (error: any) {
     console.error("Document update failed:", error);
-    return { success: false, error: error.message || "保存に失敗しました" };
+    return { success: false, error: toClientError(error, "保存に失敗しました") };
   }
 }

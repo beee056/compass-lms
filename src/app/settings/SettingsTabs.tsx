@@ -1,4 +1,5 @@
 'use client';
+import { toast } from "@/lib/toast";
 
 import { useState } from 'react';
 import { Settings, Users, Building, ShieldCheck, ListTodo } from 'lucide-react';
@@ -29,14 +30,14 @@ export default function SettingsTabs({ tenant, templates }: { tenant: any; templ
           タスクテンプレート
         </button>
         <button 
-          onClick={() => alert('メンター管理機能は現在開発中です')}
+          onClick={() => toast.info('メンター管理機能は現在開発中です')}
           className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-3 cursor-not-allowed"
         >
           <Users className="h-5 w-5" />
           メンター管理 (準備中)
         </button>
         <button 
-          onClick={() => alert('セキュリティ機能は現在開発中です')}
+          onClick={() => toast.info('セキュリティ機能は現在開発中です')}
           className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-3 cursor-not-allowed"
         >
           <ShieldCheck className="h-5 w-5" />
@@ -50,7 +51,7 @@ export default function SettingsTabs({ tenant, templates }: { tenant: any; templ
             <h2 className="text-lg font-bold text-slate-800 mb-6">組織プロフィール</h2>
             <form action={async (formData) => {
               await updateTenantSettings(formData);
-              alert('保存しました');
+              toast.success('保存しました');
             }} className="space-y-4">
               <div>
                 <label className="text-sm font-semibold text-slate-700 mb-1 block">塾名 / 組織名</label>

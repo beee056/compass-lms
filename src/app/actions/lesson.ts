@@ -1,19 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/actions";
+import { assertStudentAccess } from "@/lib/authz";
 
 // 生徒の解答を保存し、AIに添削を依頼するアクション
 export async function submitStepAnswer(
-  stepId: string, 
-  studentProfileId: string, 
+  stepId: string,
+  studentProfileId: string,
   content: string,
   prompt: string
 ) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    const user = await getCurrentUser();
+    if (studentProfileId) {
+      // 生徒は自分自身、メンターは自テナントの生徒の解答のみ保存可能
+      await assertStudentAccess(user, studentProfileId);
+    }
 
     // 1. 解答を保存または更新 (studentProfileIdが存在する場合のみ)
     let stepAnswerId = null;

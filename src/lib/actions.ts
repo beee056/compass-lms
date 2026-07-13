@@ -4,6 +4,17 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import prisma from "./prisma";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "./email";
+import { randomUUID } from "crypto";
+import { z } from "zod";
+import {
+  assertMentor,
+  assertStudentAccess,
+  findAuthorizedTask,
+  findAuthorizedDocument,
+  findAuthorizedUniversity,
+  toClientError,
+  ValidationError
+} from "./authz";
 
 // 日付計算ヘルパー
 function getFutureDate(days: number): Date {
@@ -13,9 +24,33 @@ function getFutureDate(days: number): Date {
   return d;
 }
 
-// 意味のあるID生成ヘルパー
+// ID生成ヘルパー（推測不能なUUIDベース。連番・タイムスタンプ由来のIDはIDORを容易にするため使わない）
 function generateId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+  return `${prefix}-${randomUUID()}`;
+}
+
+// 入力検証ヘルパー
+function validateText(value: string | null | undefined, label: string, max = 200): string {
+  const result = z.string()
+    .trim()
+    .min(1, `${label}を入力してください`)
+    .max(max, `${label}は${max}文字以内で入力してください`)
+    .safeParse(value ?? "");
+  if (!result.success) throw new ValidationError(result.error.issues[0].message);
+  return result.data;
+}
+
+function validateOptionalEmail(value: string | null | undefined, label: string): string | null {
+  if (!value || !value.trim()) return null;
+  const result = z.email().max(254).safeParse(value.trim());
+  if (!result.success) throw new ValidationError(`${label}の形式が不正です`);
+  return result.data;
+}
+
+function parseDateInput(dateStr: string): Date {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) throw new ValidationError("日付の形式が不正です");
+  return d;
 }
 
 // ヘルパー関数: 現在のユーザーとテナントIDを取得する
@@ -127,6 +162,7 @@ export async function getCurrentUser() {
 export async function getStudents() {
   try {
     const user = await getCurrentUser();
+    assertMentor(user);
 
     const students = await prisma.studentProfile.findMany({
       where: { tenantId: user.tenantId },
@@ -157,19 +193,16 @@ export async function getStudents() {
 export async function createStudent(formData: FormData) {
   try {
     const user = await getCurrentUser();
-    
-    const name = formData.get("name") as string;
-    const universityStr = formData.get("university") as string;
-    const phase = formData.get("phase") as string;
+    assertMentor(user);
+
+    const name = validateText(formData.get("name") as string, "氏名", 100);
+    const universityStr = validateText(formData.get("university") as string, "志望校", 200);
+    const phase = validateText(formData.get("phase") as string, "フェーズ", 50);
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
     const phone = formData.get("phone") as string || null;
-    const parentEmail = formData.get("parentEmail") as string || null;
-    const studentEmail = formData.get("studentEmail") as string || null;
-
-    if (!name || !universityStr || !phase) {
-      throw new Error("Missing required fields");
-    }
+    const parentEmail = validateOptionalEmail(formData.get("parentEmail") as string, "保護者メールアドレス");
+    const studentEmail = validateOptionalEmail(formData.get("studentEmail") as string, "生徒メールアドレス");
 
     // 大学名をパース (例: "慶應義塾大学 総合政策学部")
     const parts = universityStr.split(" ");
@@ -218,26 +251,24 @@ export async function createStudent(formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to create student:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 export async function updateStudent(studentId: string, formData: FormData) {
   try {
-    await getCurrentUser(); // 認証チェック
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
 
-    const name = formData.get("name") as string;
-    const phase = formData.get("phase") as string;
+    const name = validateText(formData.get("name") as string, "氏名", 100);
+    const phase = validateText(formData.get("phase") as string, "フェーズ", 50);
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
     const phone = formData.get("phone") as string || null;
-    const parentEmail = formData.get("parentEmail") as string || null;
-    const studentEmail = formData.get("studentEmail") as string || null;
-    const status = formData.get("status") as string || "ACTIVE";
-
-    if (!name || !phase) {
-      throw new Error("Missing required fields");
-    }
+    const parentEmail = validateOptionalEmail(formData.get("parentEmail") as string, "保護者メールアドレス");
+    const studentEmail = validateOptionalEmail(formData.get("studentEmail") as string, "生徒メールアドレス");
+    const status = formData.get("status") as string === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
 
     await prisma.studentProfile.update({
       where: { id: studentId },
@@ -258,19 +289,16 @@ export async function updateStudent(studentId: string, formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to update student:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 export async function updateTenantSettings(formData: FormData) {
   try {
     const user = await getCurrentUser();
-    
-    const name = formData.get("name") as string;
-    
-    if (!name) {
-      throw new Error("Missing required fields");
-    }
+    assertMentor(user);
+
+    const name = validateText(formData.get("name") as string, "ワークスペース名", 100);
 
     await prisma.tenant.update({
       where: { id: user.tenantId },
@@ -281,7 +309,7 @@ export async function updateTenantSettings(formData: FormData) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to update settings:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -297,6 +325,7 @@ export async function getTenant() {
 export async function getScheduleData() {
   try {
     const user = await getCurrentUser();
+    assertMentor(user);
 
     // 全生徒のマイルストーンとタスクを取得
     const milestones = await prisma.milestone.findMany({
@@ -326,11 +355,14 @@ export async function getScheduleData() {
 export async function createTask(studentId: string, title: string, dueDateStr?: string, type: string = "TODO", sendEmailNotification: boolean = false) {
   try {
     const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
+    const validTitle = validateText(title, "タスク名");
 
     // 日付を調整
     let adjustedDueDate = null;
     if (dueDateStr) {
-      adjustedDueDate = new Date(dueDateStr);
+      adjustedDueDate = parseDateInput(dueDateStr);
       adjustedDueDate.setHours(23, 59, 59, 999);
     }
 
@@ -338,25 +370,25 @@ export async function createTask(studentId: string, title: string, dueDateStr?: 
       data: {
         id: generateId('task'),
         studentProfileId: studentId,
-        title,
+        title: validTitle,
         dueDate: adjustedDueDate,
         type,
         completed: false
       }
     });
-    
+
     // 生徒情報を取得してメールアドレスがあれば通知
     if (sendEmailNotification) {
       const student = await prisma.studentProfile.findUnique({
         where: { id: studentId },
         include: { user: true }
       });
-      
+
       if (student?.user?.email) {
         await sendEmail(
           student.user.email,
-          `【Compass】新しいタスクが追加されました: ${title}`,
-          `${student.name} さん\n\n指導者から新しいタスク「${title}」が追加されました。\nCompassにログインして詳細を確認してください。\n期限: ${dueDateStr ? dueDateStr : 'なし'}`
+          `【Compass】新しいタスクが追加されました: ${validTitle}`,
+          `${student.name} さん\n\n指導者から新しいタスク「${validTitle}」が追加されました。\nCompassにログインして詳細を確認してください。\n期限: ${dueDateStr ? dueDateStr : 'なし'}`
         );
       }
     }
@@ -365,7 +397,7 @@ export async function createTask(studentId: string, title: string, dueDateStr?: 
     return { success: true, task: newTask };
   } catch (error: any) {
     console.error("Failed to create task:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -374,11 +406,8 @@ export async function toggleTaskCompletion(taskId: string) {
   try {
     const user = await getCurrentUser();
 
-    const task = await prisma.task.findUnique({
-      where: { id: taskId }
-    });
-
-    if (!task) throw new Error("Task not found");
+    // 生徒は自分のタスクのみ、メンターは自テナントのタスクのみ操作可能
+    const task = await findAuthorizedTask(user, taskId);
 
     const updated = await prisma.task.update({
       where: { id: taskId },
@@ -396,20 +425,16 @@ export async function toggleTaskCompletion(taskId: string) {
     return { success: true, completed: updated.completed };
   } catch (error: any) {
     console.error("Failed to toggle task:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 // タスク削除アクション
 export async function deleteTask(taskId: string) {
   try {
-    await getCurrentUser();
-
-    const task = await prisma.task.findUnique({
-      where: { id: taskId }
-    });
-
-    if (!task) throw new Error("Task not found");
+    const user = await getCurrentUser();
+    assertMentor(user);
+    const task = await findAuthorizedTask(user, taskId);
 
     await prisma.task.delete({
       where: { id: taskId }
@@ -420,97 +445,93 @@ export async function deleteTask(taskId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to delete task:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 // タスク編集アクション
 export async function updateTask(taskId: string, title: string, dueDateStr?: string) {
   try {
-    await getCurrentUser();
+    const user = await getCurrentUser();
+    assertMentor(user);
+    const task = await findAuthorizedTask(user, taskId);
+    const validTitle = validateText(title, "タスク名");
 
     // 日付を調整
     let adjustedDueDate = null;
     if (dueDateStr) {
-      adjustedDueDate = new Date(dueDateStr);
+      adjustedDueDate = parseDateInput(dueDateStr);
       adjustedDueDate.setHours(23, 59, 59, 999);
     }
-
-    const task = await prisma.task.findUnique({
-      where: { id: taskId }
-    });
-
-    if (!task) throw new Error("Task not found");
 
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
       data: {
-        title,
+        title: validTitle,
         dueDate: adjustedDueDate
       }
     });
 
-    await addActivityLog("TASK_EDITED", `タスクの内容を「${title}」に変更しました`, task.studentProfileId);
+    await addActivityLog("TASK_EDITED", `タスクの内容を「${validTitle}」に変更しました`, task.studentProfileId);
 
     revalidatePath(`/students/${task.studentProfileId}`);
     revalidatePath("/schedule");
     return { success: true, task: updatedTask };
   } catch (error: any) {
     console.error("Failed to update task:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 // ドキュメント更新アクション
 export async function updateDocument(documentId: string, title: string, dueDateStr?: string | null) {
   try {
-    await getCurrentUser();
+    const user = await getCurrentUser();
+    const doc = await findAuthorizedDocument(user, documentId);
+    const validTitle = validateText(title, "書類名");
 
     let adjustedDueDate = null;
     if (dueDateStr) {
-      adjustedDueDate = new Date(dueDateStr);
+      adjustedDueDate = parseDateInput(dueDateStr);
       adjustedDueDate.setHours(23, 59, 59, 999);
     }
-
-    const doc = await prisma.document.findUnique({
-      where: { id: documentId }
-    });
-
-    if (!doc) throw new Error("Document not found");
 
     const oldTitle = doc.title;
 
     await prisma.document.update({
       where: { id: documentId },
-      data: { 
-        title,
+      data: {
+        title: validTitle,
         dueDate: adjustedDueDate
       }
     });
 
-    if (oldTitle !== title) {
-      await addActivityLog("DOCUMENT_UPDATED", `書類の名称を「${oldTitle}」から「${title}」に変更しました`, doc.studentProfileId);
+    if (oldTitle !== validTitle) {
+      await addActivityLog("DOCUMENT_UPDATED", `書類の名称を「${oldTitle}」から「${validTitle}」に変更しました`, doc.studentProfileId);
     }
 
     revalidatePath(`/students/${doc.studentProfileId}`);
     return { success: true };
   } catch (error: any) {
     console.error("Failed to update document:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 // マイルストーン作成アクション
 export async function createMilestone(studentId: string, title: string, dateStr: string, type: string, sendEmailNotification: boolean = false) {
   try {
-    await getCurrentUser();
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
+    const validTitle = validateText(title, "マイルストーン名");
 
     await prisma.milestone.create({
       data: {
         id: generateId('milestone'),
         studentProfileId: studentId,
-        title,
-        date: new Date(dateStr),
+        title: validTitle,
+        date: parseDateInput(dateStr),
         type,
         status: "TODO"
       }
@@ -537,20 +558,15 @@ export async function createMilestone(studentId: string, title: string, dateStr:
     return { success: true };
   } catch (error: any) {
     console.error("Failed to create milestone:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 // ドキュメントアーカイブアクション
 export async function archiveDocument(documentId: string) {
   try {
-    await getCurrentUser();
-
-    const doc = await prisma.document.findUnique({
-      where: { id: documentId }
-    });
-
-    if (!doc) throw new Error("Document not found");
+    const user = await getCurrentUser();
+    const doc = await findAuthorizedDocument(user, documentId);
 
     await prisma.document.update({
       where: { id: documentId },
@@ -561,7 +577,7 @@ export async function archiveDocument(documentId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to archive document:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -569,6 +585,10 @@ export async function archiveDocument(documentId: string) {
 export async function addUniversity(studentId: string, name: string, department: string, templateId?: string) {
   try {
     const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
+    name = validateText(name, "大学名", 100);
+    department = validateText(department, "学部名", 100);
 
     const newUni = await prisma.university.create({
       data: {
@@ -628,30 +648,31 @@ export async function addUniversity(studentId: string, name: string, department:
     return { success: true, university: newUni };
   } catch (error: any) {
     console.error("Failed to add university:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
 // 生徒削除（退会）アクション
 export async function deleteStudent(studentId: string) {
   try {
-    await getCurrentUser(); // 認証チェック
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
 
-    // 関連データを物理削除
-    await prisma.university.deleteMany({ where: { studentProfileId: studentId } });
-    await prisma.task.deleteMany({ where: { studentProfileId: studentId } });
-    await prisma.milestone.deleteMany({ where: { studentProfileId: studentId } });
-    await prisma.document.deleteMany({ where: { studentProfileId: studentId } });
-
-    await prisma.studentProfile.delete({
-      where: { id: studentId }
-    });
+    // 関連データを物理削除（途中失敗で中途半端に消えないようトランザクション化）
+    await prisma.$transaction([
+      prisma.university.deleteMany({ where: { studentProfileId: studentId } }),
+      prisma.task.deleteMany({ where: { studentProfileId: studentId } }),
+      prisma.milestone.deleteMany({ where: { studentProfileId: studentId } }),
+      prisma.document.deleteMany({ where: { studentProfileId: studentId } }),
+      prisma.studentProfile.delete({ where: { id: studentId } })
+    ]);
 
     revalidatePath("/");
     return { success: true };
   } catch (error: any) {
     console.error("Failed to delete student:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -659,11 +680,10 @@ export async function deleteStudent(studentId: string) {
 export async function editUniversity(universityId: string, name: string, department: string) {
   try {
     const user = await getCurrentUser();
-
-    const existingUni = await prisma.university.findUnique({
-      where: { id: universityId }
-    });
-    if (!existingUni) throw new Error("University not found");
+    assertMentor(user);
+    const existingUni = await findAuthorizedUniversity(user, universityId);
+    name = validateText(name, "大学名", 100);
+    department = validateText(department, "学部名", 100);
 
     const oldName = existingUni.name;
     const oldDept = existingUni.department;
@@ -721,7 +741,7 @@ export async function editUniversity(universityId: string, name: string, departm
     return { success: true, university: updatedUni };
   } catch (error: any) {
     console.error("Failed to edit university:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -754,7 +774,8 @@ export async function getActivityLogs(studentProfileId?: string) {
     const user = await getCurrentUser();
     // @ts-ignore
     const logs = await prisma.activityLog.findMany({
-      where: studentProfileId ? { studentProfileId } : { tenantId: user.tenantId },
+      // 必ず自テナントに限定する（studentProfileId 指定時もテナント越えを防ぐ）
+      where: { tenantId: user.tenantId, ...(studentProfileId ? { studentProfileId } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 50
     });
@@ -768,27 +789,28 @@ export async function getActivityLogs(studentProfileId?: string) {
 export async function addTaskComment(taskId: string, content: string) {
   try {
     const user = await getCurrentUser();
-    
+
+    // 生徒は自分のタスクのみ、メンターは自テナントのタスクのみコメント可能
+    const task = await findAuthorizedTask(user, taskId);
+    const validContent = validateText(content, "コメント", 2000);
+
     // @ts-ignore
     const comment = await prisma.taskComment.create({
       data: {
         id: generateId('comment'),
         taskId,
-        content,
+        content: validContent,
         authorId: user.id,
         authorName: user.name
       }
     });
 
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (task) {
-      await addActivityLog("COMMENT_ADDED", `タスク「${task.title}」にコメントが追加されました`, task.studentProfileId);
-      revalidatePath(`/students/${task.studentProfileId}`);
-    }
+    await addActivityLog("COMMENT_ADDED", `タスク「${task.title}」にコメントが追加されました`, task.studentProfileId);
+    revalidatePath(`/students/${task.studentProfileId}`);
 
     return { success: true, comment };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -812,6 +834,7 @@ export async function getTemplates() {
 export async function createTemplate(name: string, items: { title: string, type: string, daysOffset: number }[]) {
   try {
     const user = await getCurrentUser();
+    assertMentor(user);
     // @ts-ignore
     const template = await prisma.taskTemplate.create({
       data: {
@@ -826,7 +849,7 @@ export async function createTemplate(name: string, items: { title: string, type:
     revalidatePath("/settings");
     return { success: true, template };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 
@@ -835,16 +858,17 @@ export async function createStudentTask(title: string, dueDateStr?: string) {
   try {
     const user = await getCurrentUser();
     if (user.role !== "STUDENT" || !user.studentProfile) {
-      throw new Error("Student profile not found");
+      throw new ValidationError("生徒プロフィールが見つかりません");
     }
+    const validTitle = validateText(title, "タスク名");
 
-    const dueDate = dueDateStr ? new Date(dueDateStr) : null;
+    const dueDate = dueDateStr ? parseDateInput(dueDateStr) : null;
 
     const task = await prisma.task.create({
       data: {
         id: generateId('task'),
         studentProfileId: user.studentProfile.id,
-        title,
+        title: validTitle,
         dueDate,
         type: "TODO",
         completed: false,
@@ -852,12 +876,12 @@ export async function createStudentTask(title: string, dueDateStr?: string) {
       } as any
     });
 
-    await addActivityLog("TASK_CREATED_BY_STUDENT", `生徒自身がタスク「${title}」を追加しました`, user.studentProfile.id);
+    await addActivityLog("TASK_CREATED_BY_STUDENT", `生徒自身がタスク「${validTitle}」を追加しました`, user.studentProfile.id);
 
     revalidatePath("/portal");
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: toClientError(error) };
   }
 }
 

@@ -9,8 +9,13 @@ export default async function MentorDocumentPage({ params }: { params: { id: str
     redirect("/portal");
   }
 
-  const document = await prisma.document.findUnique({
-    where: { id: params.docId, studentProfileId: params.id }
+  // 自テナントの生徒の書類のみ閲覧可能
+  const document = await prisma.document.findFirst({
+    where: {
+      id: params.docId,
+      studentProfileId: params.id,
+      studentProfile: { tenantId: user.tenantId }
+    }
   });
 
   if (!document || !document.isInternal) {

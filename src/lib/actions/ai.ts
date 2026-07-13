@@ -1,11 +1,13 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 import { generateObject, generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
+import { getCurrentUser } from "../actions";
+import { assertStudentAccess, toClientError } from "../authz";
 
 // APIキーを環境変数から取得（なければエラー）
 // .env または Vercel Dashboard に GOOGLE_GENERATIVE_AI_API_KEY を設定している想定
@@ -39,10 +41,10 @@ const evaluationSchema = z.object({
 
 export async function evaluatePractice(studentId: string, type: string, promptText: string, answer: string) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    // 生徒は自分自身、メンターは自テナントの生徒のみ添削可能
+    const user = await getCurrentUser();
+    await assertStudentAccess(user, studentId);
 
-    // 生徒情報を確認
     const student = await prisma.studentProfile.findUnique({
       where: { id: studentId }
     });
@@ -72,7 +74,7 @@ ${answer}
     // データベースに保存
     const record = await prisma.practiceRecord.create({
       data: {
-        id: `prac-${Date.now()}`, // UUIDではなくシンプルなプレフィックス
+        id: `prac-${randomUUID()}`,
         studentProfileId: studentId,
         type,
         prompt: promptText,
@@ -88,12 +90,15 @@ ${answer}
     return { success: true, recordId: record.id };
   } catch (error: any) {
     console.error("AI Evaluation failed:", error);
-    return { success: false, error: error.message || "添削の実行に失敗しました" };
+    return { success: false, error: toClientError(error, "添削の実行に失敗しました") };
   }
 }
 
 export async function getPracticeRecords(studentId: string) {
   try {
+    const user = await getCurrentUser();
+    await assertStudentAccess(user, studentId);
+
     const records = await prisma.practiceRecord.findMany({
       where: { studentProfileId: studentId },
       orderBy: { createdAt: "desc" }

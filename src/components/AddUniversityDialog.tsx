@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Plus, Loader2 } from "lucide-react";
@@ -29,12 +30,13 @@ export default function AddUniversityDialog({ studentId, templates = [] }: AddUn
       const selectedTemplateId = templateId === "none" ? undefined : templateId;
       const result = await addUniversity(studentId, name, department, selectedTemplateId);
       if (result.success) {
+        toast.success("志望校を追加しました");
         setName("");
         setDepartment("");
         setTemplateId("none");
         setOpen(false);
       } else {
-        alert("志望校の追加に失敗しました: " + result.error);
+        toast.error("志望校の追加に失敗しました: " + result.error);
       }
     });
   };

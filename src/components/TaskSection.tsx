@@ -15,6 +15,7 @@ interface TaskComment {
   id: string;
   content: string;
   authorName: string;
+  authorRole?: string;
   createdAt: Date;
 }
 
@@ -252,8 +253,13 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
                     {task.completed && <CheckCircle2 className="h-4 w-4" />}
                   </button>
                   <div>
-                    <h4 className={`text-sm font-bold text-slate-800 ${task.completed ? 'line-through text-slate-400 font-normal' : ''}`}>
+                    <h4 className={`text-sm font-bold text-slate-800 flex items-center gap-2 ${task.completed ? 'line-through text-slate-400 font-normal' : ''}`}>
                       {task.title}
+                      {!isStudent && !task.completed && task.comments && task.comments.length > 0 && task.comments[task.comments.length - 1].authorRole === "STUDENT" && (
+                        <span className="inline-flex items-center rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-black text-amber-700">
+                          要返信
+                        </span>
+                      )}
                     </h4>
                     <div className="flex items-center gap-3 mt-1.5">
                       {task.dueDate && (

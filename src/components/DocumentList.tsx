@@ -1,10 +1,10 @@
 "use client";
 import { toast } from "@/lib/toast";
 
-import { useState } from "react";
-import { Folder, ExternalLink, FileText, Clock, Archive } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Folder, ExternalLink, FileText, Clock, Archive, Send, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { archiveDocument } from "@/lib/actions";
+import { archiveDocument, submitDocument, setDocumentStatus } from "@/lib/actions";
 import CreateDocumentButton from "./CreateDocumentButton";
 import EditDocumentDialog from "./EditDocumentDialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -18,8 +18,22 @@ interface Document {
   isInternal?: boolean;
   content?: string | null;
   isArchived: boolean;
+  status?: string;
   updatedAt: Date;
 }
+
+const STATUS_STYLE: Record<string, string> = {
+  DRAFT: "bg-slate-100 text-slate-500 border-slate-200",
+  SUBMITTED: "bg-amber-50 text-amber-700 border-amber-200",
+  REVIEWING: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  DONE: "bg-emerald-50 text-emerald-700 border-emerald-200"
+};
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "下書き",
+  SUBMITTED: "提出済み",
+  REVIEWING: "レビュー中",
+  DONE: "完了"
+};
 
 interface DocumentListProps {
   studentId: string;
@@ -32,6 +46,31 @@ interface DocumentListProps {
 export default function DocumentList({ studentId, driveUrl, initialDocuments, universities, isStudent = false }: DocumentListProps) {
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
   const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleSubmit = (docId: string) => {
+    startTransition(async () => {
+      const result = await submitDocument(docId);
+      if (result.success) {
+        toast.success("書類を提出しました");
+        setDocuments(prev => prev.map(d => d.id === docId ? { ...d, status: "SUBMITTED" } : d));
+      } else {
+        toast.error("提出に失敗しました: " + result.error);
+      }
+    });
+  };
+
+  const handleStatusChange = (docId: string, status: string) => {
+    startTransition(async () => {
+      const result = await setDocumentStatus(docId, status);
+      if (result.success) {
+        toast.success(`ステータスを「${STATUS_LABEL[status]}」に更新しました`);
+        setDocuments(prev => prev.map(d => d.id === docId ? { ...d, status } : d));
+      } else {
+        toast.error("更新に失敗しました: " + result.error);
+      }
+    });
+  };
 
   const handleArchive = async () => {
     const docId = archiveTargetId;
@@ -122,6 +161,11 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                       <span className="text-[11px] py-0.5 px-2 bg-slate-100/80 text-slate-500 font-bold rounded-sm border border-slate-200/50">
                         {doc.type}
                       </span>
+                      {doc.isInternal && (
+                        <span className={`text-[11px] py-0.5 px-2 font-bold rounded-sm border ${STATUS_STYLE[doc.status || "DRAFT"]}`}>
+                          {STATUS_LABEL[doc.status || "DRAFT"]}
+                        </span>
+                      )}
                       {doc.dueDate && (
                         <span className="text-xs text-indigo-500 font-bold flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -134,17 +178,53 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                     </div>
                   </div>
                 </div>
+
+                {/* 生徒: 内部書類を提出するボタン（下書き/差し戻し時のみ） */}
+                {isStudent && doc.isInternal && (doc.status === "DRAFT" || !doc.status) && (
+                  <button
+                    onClick={() => handleSubmit(doc.id)}
+                    disabled={isPending}
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    <Send className="h-4 w-4" />
+                    提出する
+                  </button>
+                )}
+                {isStudent && doc.status === "DONE" && (
+                  <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    完了
+                  </span>
+                )}
+
                 {!isStudent && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <EditDocumentDialog document={doc} />
-                    <button
-                      onClick={() => setArchiveTargetId(doc.id)}
-                      className="p-2.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors focus:opacity-100"
-                      title="アーカイブする"
-                      aria-label="書類をアーカイブする"
-                    >
-                      <Archive className="h-4 w-4" />
-                    </button>
+                  <div className="flex items-center gap-1">
+                    {/* メンター: ステータス変更 */}
+                    {doc.isInternal && (
+                      <select
+                        value={doc.status || "DRAFT"}
+                        onChange={(e) => handleStatusChange(doc.id, e.target.value)}
+                        disabled={isPending}
+                        aria-label="書類のステータスを変更"
+                        className="mr-1 h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-bold text-slate-600 focus-visible:ring-[#3346a3]/30"
+                      >
+                        <option value="DRAFT">下書き</option>
+                        <option value="SUBMITTED">提出済み</option>
+                        <option value="REVIEWING">レビュー中</option>
+                        <option value="DONE">完了</option>
+                      </select>
+                    )}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <EditDocumentDialog document={doc} />
+                      <button
+                        onClick={() => setArchiveTargetId(doc.id)}
+                        className="p-2.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors focus:opacity-100"
+                        title="アーカイブする"
+                        aria-label="書類をアーカイブする"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

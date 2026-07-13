@@ -180,24 +180,35 @@ export async function getStudents() {
 
     const students = await prisma.studentProfile.findMany({
       where: { tenantId: user.tenantId },
-      include: { universities: true },
+      include: {
+        universities: true,
+        // 最終活動（アクティビティログの最新1件）で停滞を検知
+        logs: { take: 1, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }
+      },
       orderBy: { updatedAt: 'desc' }
     });
-    
-    return students.map((s: any) => ({
-      id: s.id,
-      name: s.name,
-      universities: s.universities.map((u: any) => `${u.name} ${u.department}`),
-      lastUpdated: s.updatedAt.toISOString().split('T')[0],
-      initial: s.name.charAt(0),
-      phase: s.phase,
-      highSchool: s.highSchool || "",
-      grade: s.grade || "",
-      phone: s.phone || "",
-      parentEmail: s.parentEmail || "",
-      studentEmail: s.studentEmail || "",
-      status: s.status || "ACTIVE"
-    }));
+
+    const now = Date.now();
+    return students.map((s: any) => {
+      const lastActivity: Date = s.logs?.[0]?.createdAt ?? s.updatedAt;
+      const daysSinceActivity = Math.floor((now - new Date(lastActivity).getTime()) / 86_400_000);
+      return {
+        id: s.id,
+        name: s.name,
+        universities: s.universities.map((u: any) => `${u.name} ${u.department}`),
+        lastUpdated: s.updatedAt.toISOString().split('T')[0],
+        lastActivityAt: new Date(lastActivity).toISOString(),
+        daysSinceActivity,
+        initial: s.name.charAt(0),
+        phase: s.phase,
+        highSchool: s.highSchool || "",
+        grade: s.grade || "",
+        phone: s.phone || "",
+        parentEmail: s.parentEmail || "",
+        studentEmail: s.studentEmail || "",
+        status: s.status || "ACTIVE"
+      };
+    });
   } catch (error) {
     console.error("Failed to get students:", error);
     return [];
@@ -341,22 +352,33 @@ export async function getScheduleData() {
     const user = await getCurrentUser();
     assertMentor(user);
 
-    // 全生徒のマイルストーンとタスクを取得
-    const milestones = await prisma.milestone.findMany({
-      where: { studentProfile: { tenantId: user.tenantId } },
-      include: { studentProfile: true },
-      orderBy: { date: 'asc' }
-    });
+    // 全生徒のマイルストーンとタスクを並列取得
+    const [milestones, rawTasks] = await Promise.all([
+      prisma.milestone.findMany({
+        where: { studentProfile: { tenantId: user.tenantId } },
+        include: { studentProfile: true },
+        orderBy: { date: 'asc' }
+      }),
+      prisma.task.findMany({
+        where: {
+          studentProfile: { tenantId: user.tenantId },
+          completed: false,
+          dueDate: { not: null }
+        },
+        include: {
+          studentProfile: true,
+          // 最新コメント1件で「生徒からの返信待ち」を判定
+          comments: { take: 1, orderBy: { createdAt: 'desc' }, select: { authorRole: true } }
+        },
+        orderBy: { dueDate: 'asc' }
+      })
+    ]);
 
-    const tasks = await prisma.task.findMany({
-      where: { 
-        studentProfile: { tenantId: user.tenantId },
-        completed: false,
-        dueDate: { not: null }
-      },
-      include: { studentProfile: true },
-      orderBy: { dueDate: 'asc' }
-    });
+    // needsReply: 最後の発言が生徒 = メンターの返信待ち
+    const tasks = rawTasks.map((t: any) => ({
+      ...t,
+      needsReply: t.comments?.[0]?.authorRole === "STUDENT"
+    }));
 
     return { milestones, tasks };
   } catch (error) {
@@ -577,6 +599,61 @@ export async function archiveDocument(documentId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Failed to archive document:", error);
+    return { success: false, error: toClientError(error) };
+  }
+}
+
+const DOCUMENT_STATUSES = ["DRAFT", "SUBMITTED", "REVIEWING", "DONE"] as const;
+const DOCUMENT_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "下書き",
+  SUBMITTED: "提出済み",
+  REVIEWING: "レビュー中",
+  DONE: "完了"
+};
+
+// 生徒が書類を「提出」するアクション（生徒本人のみ）
+export async function submitDocument(documentId: string) {
+  try {
+    const user = await getCurrentUser();
+    const doc = await findAuthorizedDocument(user, documentId);
+
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { status: "SUBMITTED" }
+    });
+
+    await addActivityLog("DOCUMENT_SUBMITTED", `「${doc.title}」を提出しました`, doc.studentProfileId);
+    revalidatePath(`/portal`);
+    revalidatePath(`/students/${doc.studentProfileId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to submit document:", error);
+    return { success: false, error: toClientError(error) };
+  }
+}
+
+// メンターが書類のステータスを更新するアクション（レビュー中/完了/差し戻し）
+export async function setDocumentStatus(documentId: string, status: string) {
+  try {
+    const user = await getCurrentUser();
+    assertMentor(user);
+    const doc = await findAuthorizedDocument(user, documentId);
+
+    if (!DOCUMENT_STATUSES.includes(status as any)) {
+      throw new ValidationError("不正なステータスです");
+    }
+
+    await prisma.document.update({
+      where: { id: documentId },
+      data: { status }
+    });
+
+    await addActivityLog("DOCUMENT_STATUS_CHANGED", `「${doc.title}」を${DOCUMENT_STATUS_LABEL[status]}に更新しました`, doc.studentProfileId);
+    revalidatePath(`/students/${doc.studentProfileId}`);
+    revalidatePath(`/portal`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to set document status:", error);
     return { success: false, error: toClientError(error) };
   }
 }

@@ -22,6 +22,8 @@ interface StudentData {
   name: string;
   universities: string[];
   lastUpdated: string;
+  lastActivityAt?: string;
+  daysSinceActivity?: number;
   initial: string;
   phase: string;
   highSchool: string;
@@ -32,12 +34,16 @@ interface StudentData {
   status: string;
 }
 
+// 停滞とみなす日数のしきい値
+const STALE_DAYS = 7;
+
 interface ScheduleTask {
   id: string;
   title: string;
   dueDate: Date | string | null;
   completed: boolean;
   studentProfileId: string;
+  needsReply?: boolean;
   studentProfile?: {
     name?: string | null;
   } | null;
@@ -160,8 +166,59 @@ export default function MentorCommandCenter({
   const activePhaseIndex = selectedStudent ? getPhaseIndex(selectedStudent.phase) : 0;
   const selectedProgress = selectedStudent ? getPhaseProgress(selectedStudent.phase) : 0;
 
+  // Phase 3: 停滞している生徒（7日以上活動なし）と、メンターの返信待ちタスク
+  const stalledStudents = activeStudents
+    .filter((s) => (s.daysSinceActivity ?? 0) >= STALE_DAYS)
+    .sort((a, b) => (b.daysSinceActivity ?? 0) - (a.daysSinceActivity ?? 0));
+  const replyNeededTasks = tasks.filter((t) => t.needsReply && !t.completed);
+
   return (
     <div className="w-full animate-in fade-in duration-500 space-y-8 pb-20 text-[#17202a]">
+      {(stalledStudents.length > 0 || replyNeededTasks.length > 0) && (
+        <section className="grid gap-4 md:grid-cols-2">
+          {stalledStudents.length > 0 && (
+            <div className="rounded-lg border border-[#f0b0a7] bg-[#fff3f0] p-4">
+              <div className="flex items-center gap-2 text-sm font-black text-[#9f2d20]">
+                <AlertTriangle className="h-4 w-4" />
+                停滞している生徒 {stalledStudents.length}名（{STALE_DAYS}日以上動きなし）
+              </div>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {stalledStudents.slice(0, 6).map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/students/${s.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-[#f0b0a7] bg-white px-2.5 py-1 text-xs font-bold text-[#9f2d20] transition-colors hover:bg-[#ffe9e4]"
+                  >
+                    {s.name}
+                    <span className="text-[#c06a5f]">{s.daysSinceActivity}日</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {replyNeededTasks.length > 0 && (
+            <div className="rounded-lg border border-[#ead28a] bg-[#fff7d9] p-4">
+              <div className="flex items-center gap-2 text-sm font-black text-[#7a5400]">
+                <MessageSquare className="h-4 w-4" />
+                返信待ちのタスク {replyNeededTasks.length}件（生徒からの最新コメント）
+              </div>
+              <div className="mt-2.5 flex flex-col gap-1.5">
+                {replyNeededTasks.slice(0, 4).map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/students/${t.studentProfileId}`}
+                    className="flex items-center justify-between gap-2 rounded-md border border-[#ead28a] bg-white px-2.5 py-1.5 text-xs font-bold text-[#7a5400] transition-colors hover:bg-[#fff2c2]"
+                  >
+                    <span className="truncate">{t.title}</span>
+                    <span className="shrink-0 text-[#a07d2a]">{t.studentProfile?.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="relative overflow-hidden rounded-lg border border-[#d8dee4] bg-[#fbfcf8] p-6 md:p-8">
           <div className="absolute inset-x-0 top-0 grid h-1 grid-cols-5">

@@ -24,25 +24,38 @@ interface StudentData {
   status: string;
 }
 
+type SortKey = "stale" | "recent" | "name";
+
 export default function StudentDashboardList({ initialStudents }: { initialStudents: StudentData[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
+  const [phaseFilter, setPhaseFilter] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<SortKey>("stale");
 
-  // フィルタリングロジック
+  // 存在するフェーズの一覧（絞り込み用）
+  const phases = Array.from(new Set(initialStudents.map((s) => s.phase).filter(Boolean)));
+
+  // フィルタリング
   const filteredStudents = initialStudents.filter((student) => {
-    // 1. ステータスフィルター
     const matchStatus = student.status === statusFilter;
+    const matchPhase = phaseFilter === "ALL" || student.phase === phaseFilter;
 
-    // 2. 検索クエリフィルター
     const q = searchQuery.toLowerCase();
-    const matchQuery = 
+    const matchQuery =
       student.name.toLowerCase().includes(q) ||
       student.universities.some((u) => u.toLowerCase().includes(q)) ||
       student.highSchool.toLowerCase().includes(q) ||
       student.grade.toLowerCase().includes(q) ||
       student.phase.toLowerCase().includes(q);
 
-    return matchStatus && matchQuery;
+    return matchStatus && matchPhase && matchQuery;
+  });
+
+  // 並び替え（更新が古い順＝停滞発見をデフォルトに）
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
+    if (sortBy === "name") return a.name.localeCompare(b.name, "ja");
+    if (sortBy === "recent") return b.lastUpdated.localeCompare(a.lastUpdated);
+    return a.lastUpdated.localeCompare(b.lastUpdated); // stale: 古い順
   });
 
   return (
@@ -82,19 +95,43 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
               卒業生
             </button>
           </div>
+
+          <select
+            value={phaseFilter}
+            onChange={(e) => setPhaseFilter(e.target.value)}
+            aria-label="フェーズで絞り込み"
+            className="h-11 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30"
+          >
+            <option value="ALL">すべてのフェーズ</option>
+            {phases.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
+            aria-label="並び替え"
+            className="h-11 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30"
+          >
+            <option value="stale">更新が古い順（要フォロー）</option>
+            <option value="recent">更新が新しい順</option>
+            <option value="name">名前順</option>
+          </select>
+
           <AddStudentDialog />
         </div>
       </div>
 
       {/* 生徒一覧カードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStudents.length === 0 ? (
+        {sortedStudents.length === 0 ? (
           <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed border-[#d8dee4] bg-[#fbfcf8] py-20 text-slate-500">
             <p className="font-semibold text-lg mb-2">該当する生徒が見つかりません</p>
             <p className="text-sm">条件を変えて検索するか、生徒を追加してください。</p>
           </div>
         ) : (
-          filteredStudents.map((student) => (
+          sortedStudents.map((student) => (
             <div key={student.id} className="block group relative">
               <Card className="relative flex min-h-[260px] flex-col overflow-hidden border-[#d8dee4] bg-white p-8 shadow-sm transition-all duration-300 group-hover:border-[#3346a3]/40 group-hover:shadow-[0_8px_24px_rgba(23,32,42,0.06)]">
                 <Link href={`/students/${student.id}`} className="absolute inset-0 z-0" aria-label={`${student.name}の詳細を見る`} />

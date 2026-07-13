@@ -3,7 +3,8 @@ import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
 import { Edit2, Loader2, Trash2 } from "lucide-react";
-import { updateStudent, deleteStudent } from "@/lib/actions";
+import { updateStudent, deleteStudent, archiveStudent } from "@/lib/actions";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -27,6 +28,7 @@ interface EditStudentDialogProps {
 
 export default function EditStudentDialog({ student, trigger }: EditStudentDialogProps) {
   const [open, setOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startUpdateTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
   const router = useRouter();
@@ -46,15 +48,26 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
     });
   };
 
-  const handleDelete = () => {
-    if (!confirm(`${student.name} さんを削除（退会処理）しますか？登録されているすべての書類・タスク・スケジュール情報が完全に消去されます。この操作は取り消せません。`)) {
-      return;
-    }
+  const handleArchive = () => {
+    startDeleteTransition(async () => {
+      const result = await archiveStudent(student.id);
+      if (result.success) {
+        toast.success(`${student.name} さんを卒業生としてアーカイブしました`);
+        setConfirmOpen(false);
+        setOpen(false);
+        router.refresh();
+      } else {
+        toast.error("アーカイブに失敗しました: " + result.error);
+      }
+    });
+  };
 
+  const handleDelete = () => {
     startDeleteTransition(async () => {
       const result = await deleteStudent(student.id);
       if (result.success) {
-        toast.success("生徒を削除しました");
+        toast.success("生徒を完全に削除しました");
+        setConfirmOpen(false);
         setOpen(false);
         router.push("/");
       } else {
@@ -64,6 +77,7 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
@@ -153,15 +167,15 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
             </div>
           </div>
           <DialogFooter className="flex justify-between items-center sm:justify-between w-full border-t border-slate-100 pt-4">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              onClick={handleDelete} 
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmOpen(true)}
               disabled={isPending || isDeleting}
-              className="text-red-500 hover:text-red-700 hover:bg-red-50 font-bold flex items-center gap-1.5 p-2 rounded-lg"
+              className="text-slate-500 hover:text-red-700 hover:bg-red-50 font-bold flex items-center gap-1.5 p-2 rounded-lg"
             >
-              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              生徒を削除 (退会)
+              <Trash2 className="h-4 w-4" />
+              退会・削除
             </Button>
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">
@@ -175,5 +189,27 @@ export default function EditStudentDialog({ student, trigger }: EditStudentDialo
         </form>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      title={`${student.name} さんの退会処理`}
+      description={
+        <>
+          <span className="block mb-2">
+            まずは<strong>アーカイブ（卒業生として保管）</strong>をおすすめします。データを残したまま在籍一覧から外せます。
+          </span>
+          <span className="block text-red-600">
+            「完全に削除」を選ぶと、この生徒の<strong>志望校・タスク・書類・練習記録・活動ログがすべて消去</strong>され、元に戻せません。
+          </span>
+        </>
+      }
+      primaryAction={{ label: "アーカイブする", onClick: handleArchive }}
+      confirmLabel="完全に削除"
+      destructive
+      loading={isDeleting}
+      onConfirm={handleDelete}
+    />
+    </>
   );
 }

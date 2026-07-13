@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { archiveDocument } from "@/lib/actions";
 import CreateDocumentButton from "./CreateDocumentButton";
 import EditDocumentDialog from "./EditDocumentDialog";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 
 interface Document {
   id: string;
@@ -30,16 +31,21 @@ interface DocumentListProps {
 
 export default function DocumentList({ studentId, driveUrl, initialDocuments, universities, isStudent = false }: DocumentListProps) {
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
+  const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
 
-  const handleArchive = async (docId: string) => {
-    if (!confirm("この書類をアーカイブしますか？（一覧には表示されなくなります）")) return;
+  const handleArchive = async () => {
+    const docId = archiveTargetId;
+    if (!docId) return;
+    setArchiveTargetId(null);
 
     // 楽観的アップデート
     const originalDocs = [...documents];
     setDocuments(prev => prev.filter(d => d.id !== docId));
 
     const result = await archiveDocument(docId);
-    if (!result.success) {
+    if (result.success) {
+      toast.success("書類をアーカイブしました");
+    } else {
       toast.error("書類のアーカイブに失敗しました: " + result.error);
       setDocuments(originalDocs);
     }
@@ -131,10 +137,11 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                 {!isStudent && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <EditDocumentDialog document={doc} />
-                    <button 
-                      onClick={() => handleArchive(doc.id)}
-                      className="p-2.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors focus:opacity-100" 
+                    <button
+                      onClick={() => setArchiveTargetId(doc.id)}
+                      className="p-2.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors focus:opacity-100"
                       title="アーカイブする"
+                      aria-label="書類をアーカイブする"
                     >
                       <Archive className="h-4 w-4" />
                     </button>
@@ -145,6 +152,15 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={archiveTargetId !== null}
+        onOpenChange={(o) => { if (!o) setArchiveTargetId(null); }}
+        title="書類をアーカイブしますか？"
+        description="一覧には表示されなくなります（データは残ります）。"
+        confirmLabel="アーカイブする"
+        onConfirm={handleArchive}
+      />
     </section>
   );
 }

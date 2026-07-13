@@ -2,6 +2,7 @@ import { LayoutGrid, Calendar, Settings, LogIn, BookOpen, Compass, MonitorPlay }
 import { UserButton, SignInButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import NavLink from "@/components/layout/NavLink";
 
 export default async function Header() {
   let userId = null;
@@ -43,15 +44,15 @@ export default async function Header() {
           <>
             {user?.role === "STUDENT" ? (
               <div className="flex items-center gap-5 mr-4">
-                <Link href="/portal" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="ポータル" aria-label="ポータル">
+                <NavLink href="/portal" exact title="ポータル" baseClassName="hover:text-emerald-600 transition-colors p-1 rounded-md text-emerald-500" activeClassName="text-emerald-700 bg-emerald-50">
                   <LayoutGrid className="h-5 w-5" />
-                </Link>
-                <Link href="/portal/calendar" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="マイ・スケジュール" aria-label="マイ・スケジュール">
+                </NavLink>
+                <NavLink href="/portal/calendar" title="マイ・スケジュール" baseClassName="hover:text-emerald-600 transition-colors p-1 rounded-md text-emerald-500" activeClassName="text-emerald-700 bg-emerald-50">
                   <Calendar className="h-5 w-5" />
-                </Link>
-                <Link href="/materials" className="hover:text-emerald-600 transition-colors p-1 text-emerald-500" title="学習資料・ガイダンス" aria-label="学習資料・ガイダンス">
+                </NavLink>
+                <NavLink href="/materials" title="学習資料・ガイダンス" baseClassName="hover:text-emerald-600 transition-colors p-1 rounded-md text-emerald-500" activeClassName="text-emerald-700 bg-emerald-50">
                   <BookOpen className="h-5 w-5" />
-                </Link>
+                </NavLink>
                 <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm ml-2">
                   <span className="text-sm font-bold text-emerald-700">{user.name}</span>
                   <span className="text-xs font-semibold text-emerald-500">さんのマイページ</span>
@@ -66,18 +67,18 @@ export default async function Header() {
             {/* ナビゲーションリンクの有効化 (メンターのみ) */}
             {user?.role !== "STUDENT" && (
               <div className="flex items-center gap-5 text-slate-500 mr-4">
-                <Link href="/" className="hover:text-indigo-600 transition-colors p-1" title="ダッシュボード" aria-label="ダッシュボード">
+                <NavLink href="/" exact title="ダッシュボード">
                   <LayoutGrid className="h-5 w-5" />
-                </Link>
-                <Link href="/schedule" className="hover:text-indigo-600 transition-colors p-1" title="スケジュール" aria-label="スケジュール">
+                </NavLink>
+                <NavLink href="/schedule" title="スケジュール">
                   <Calendar className="h-5 w-5" />
-                </Link>
-                <Link href="/materials" className="hover:text-indigo-600 transition-colors p-1" title="学習資料・ガイダンス" aria-label="学習資料・ガイダンス">
+                </NavLink>
+                <NavLink href="/materials" title="学習資料・ガイダンス">
                   <BookOpen className="h-5 w-5" />
-                </Link>
-                <Link href="/settings" className="hover:text-indigo-600 transition-colors p-1" title="設定" aria-label="設定">
+                </NavLink>
+                <NavLink href="/settings" title="設定">
                   <Settings className="h-5 w-5" />
-                </Link>
+                </NavLink>
               </div>
             )}
             <UserButton />

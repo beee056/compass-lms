@@ -652,6 +652,28 @@ export async function addUniversity(studentId: string, name: string, department:
   }
 }
 
+// 生徒アーカイブ（卒業生として保管・データは残す）アクション
+export async function archiveStudent(studentId: string) {
+  try {
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
+
+    await prisma.studentProfile.update({
+      where: { id: studentId },
+      data: { status: "ARCHIVED" }
+    });
+
+    await addActivityLog("STUDENT_ARCHIVED", "生徒を卒業生としてアーカイブしました", studentId);
+    revalidatePath("/");
+    revalidatePath(`/students/${studentId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to archive student:", error);
+    return { success: false, error: toClientError(error) };
+  }
+}
+
 // 生徒削除（退会）アクション
 export async function deleteStudent(studentId: string) {
   try {

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { CheckCircle2, Clock, Plus, Trash2, Loader2, MessageSquare, Send } from "lucide-react";
 import { createTask, toggleTaskCompletion, deleteTask, addTaskComment, createStudentTask } from "@/lib/actions";
 import EditTaskDialog from "./EditTaskDialog";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -59,14 +60,20 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
     }
   };
 
-  const handleDelete = async (taskId: string) => {
-    if (!confirm("このタスクを削除しますか？")) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    const taskId = deleteTargetId;
+    if (!taskId) return;
+    setDeleteTargetId(null);
 
     const originalTasks = [...tasks];
     setTasks(prev => prev.filter(t => t.id !== taskId));
 
     const result = await deleteTask(taskId);
-    if (!result.success) {
+    if (result.success) {
+      toast.success("タスクを削除しました");
+    } else {
       toast.error("タスクの削除に失敗しました: " + result.error);
       setTasks(originalTasks);
     }
@@ -268,10 +275,11 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
                 {!isStudent && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <EditTaskDialog task={task} />
-                    <button 
-                      onClick={() => handleDelete(task.id)}
+                    <button
+                      onClick={() => setDeleteTargetId(task.id)}
                       className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:opacity-100"
                       title="タスクを削除"
+                      aria-label="タスクを削除"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -328,6 +336,16 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(o) => { if (!o) setDeleteTargetId(null); }}
+        title="タスクを削除しますか？"
+        description="このタスクと、ひも付くコメントが削除されます。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        onConfirm={handleDelete}
+      />
     </section>
   );
 }

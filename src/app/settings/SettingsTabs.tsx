@@ -2,7 +2,7 @@
 import { toast } from "@/lib/toast";
 
 import { useState } from 'react';
-import { Settings, Users, Building, ShieldCheck, ListTodo } from 'lucide-react';
+import { Building, ListTodo } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import TemplateManager from '@/components/TemplateManager';
 import { updateTenantSettings } from '@/lib/actions';
 
 export default function SettingsTabs({ tenant, templates }: { tenant: any; templates: any[] }) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'templates' | 'mentors' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'templates'>('profile');
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -28,20 +28,6 @@ export default function SettingsTabs({ tenant, templates }: { tenant: any; templ
         >
           <ListTodo className="h-5 w-5" />
           タスクテンプレート
-        </button>
-        <button 
-          onClick={() => toast.info('メンター管理機能は現在開発中です')}
-          className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-3 cursor-not-allowed"
-        >
-          <Users className="h-5 w-5" />
-          メンター管理 (準備中)
-        </button>
-        <button 
-          onClick={() => toast.info('セキュリティ機能は現在開発中です')}
-          className="w-full text-left px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-3 cursor-not-allowed"
-        >
-          <ShieldCheck className="h-5 w-5" />
-          セキュリティ連携 (準備中)
         </button>
       </div>
 

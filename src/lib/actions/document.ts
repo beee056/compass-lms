@@ -7,6 +7,7 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { getCurrentUser } from "../actions";
 import { assertMentor, assertStudentAccess, findAuthorizedDocument, toClientError } from "../authz";
+import { endOfDayJST } from "../dates";
 
 const documentDraftPrompt = `
 あなたは大学受験の総合型選抜（旧AO入試）の専門プロ指導者です。
@@ -47,12 +48,8 @@ ${keywords}
       `
     });
 
-    // DBに内部ドキュメントとして保存
-    let parsedDueDate = null;
-    if (dueDateStr) {
-      parsedDueDate = new Date(dueDateStr);
-      if (isNaN(parsedDueDate.getTime())) parsedDueDate = null;
-    }
+    // DBに内部ドキュメントとして保存（期限はJSTのその日の終わりとして保存）
+    const parsedDueDate = dueDateStr ? endOfDayJST(dueDateStr) : null;
 
     const docId = `doc-${randomUUID()}`;
     const newDoc = await prisma.document.create({

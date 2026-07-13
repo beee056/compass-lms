@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
 import { assertMentor, assertStudentAccess } from "../authz";
+import { endOfDayJST } from "../dates";
 
 export async function createStudentDocument(studentId: string, documentType: string, universityName?: string, dueDateStr?: string | null) {
   try {
@@ -11,11 +12,7 @@ export async function createStudentDocument(studentId: string, documentType: str
     assertMentor(user);
     await assertStudentAccess(user, studentId);
 
-    let adjustedDueDate = null;
-    if (dueDateStr) {
-      adjustedDueDate = new Date(dueDateStr);
-      adjustedDueDate.setHours(23, 59, 59, 999);
-    }
+    const adjustedDueDate = dueDateStr ? endOfDayJST(dueDateStr) : null;
 
     // GASのWebhook URLが環境変数にあるかチェック
     const webhookUrl = process.env.GAS_WEBHOOK_URL;

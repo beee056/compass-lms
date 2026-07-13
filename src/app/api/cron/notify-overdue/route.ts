@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { startOfTodayJST } from '@/lib/dates';
 
 // Vercel Cron からの呼び出し専用にするためのシークレット
 // vercel.json に設定するか、Headersを検証します
@@ -18,13 +19,8 @@ export async function GET(request: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // 「今日(JST)の始まり」をUTCの瞬間として算出する。
-    // Vercel実行環境はUTCのため、単純な setHours(0,0,0,0) だとJSTとの9時間ズレで
-    // 日付境界が最大9時間ずれてしまう。JST(UTC+9)基準の当日0時をUTC instantに変換する。
-    const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-    const shifted = new Date(Date.now() + JST_OFFSET_MS);
-    shifted.setUTCHours(0, 0, 0, 0);
-    const todayStartJst = new Date(shifted.getTime() - JST_OFFSET_MS);
+    // 「今日(JST)の始まり」をUTCの瞬間として算出（共通ユーティリティに統一）
+    const todayStartJst = startOfTodayJST();
 
     // 期日超過(JSTで前日以前が期限)かつ未完了のタスクを取得
     const overdueTasks = await prisma.task.findMany({

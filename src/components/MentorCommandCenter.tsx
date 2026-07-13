@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import AddStudentDialog from "@/components/AddStudentDialog";
 import StudentDashboardList from "@/components/StudentDashboardList";
+import { formatDateJST, daysUntilJST, relativeDueLabelJST } from "@/lib/dates";
 
 interface StudentData {
   id: string;
@@ -88,39 +89,10 @@ const riskStyles = {
   }
 } as const;
 
-function toDate(value: Date | string | null | undefined): Date | null {
-  if (!value) return null;
-  return value instanceof Date ? value : new Date(value);
-}
-
-function formatDate(value: Date | string | null | undefined): string {
-  const date = toDate(value);
-  if (!date || Number.isNaN(date.getTime())) return "期限なし";
-  return date.toLocaleDateString("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    month: "numeric",
-    day: "numeric"
-  });
-}
-
-function getDaysUntil(value: Date | string | null | undefined): number {
-  const date = toDate(value);
-  if (!date || Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
-
-  const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const startOfTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return Math.ceil((startOfTarget.getTime() - startOfToday.getTime()) / 86_400_000);
-}
-
-function getRelativeDueLabel(value: Date | string | null | undefined): string {
-  const days = getDaysUntil(value);
-  if (!Number.isFinite(days)) return "期限なし";
-  if (days < 0) return `${Math.abs(days)}日超過`;
-  if (days === 0) return "今日";
-  if (days === 1) return "明日";
-  return `${days}日後`;
-}
+// 日付計算はすべて JST 基準の共通ユーティリティに委譲する（サーバーTZ=UTCとのズレ防止）
+const formatDate = formatDateJST;
+const getDaysUntil = daysUntilJST;
+const getRelativeDueLabel = relativeDueLabelJST;
 
 function getRisk(value: Date | string | null | undefined): keyof typeof riskStyles {
   const days = getDaysUntil(value);

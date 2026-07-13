@@ -19,33 +19,30 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     redirect("/portal");
   }
 
-  // 問題バンクの取得 (Client Componentへの受け渡しのためシリアライズ)
-  const rawQuestionBank = await prisma.questionBank.findMany({
-    orderBy: { createdAt: "desc" }
-  });
+  // 独立した4クエリを並列取得（直列awaitによる体感遅延を解消）
+  const [rawQuestionBank, dbStudent, templates, logs] = await Promise.all([
+    prisma.questionBank.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.studentProfile.findFirst({
+      where: { id: params.id, tenantId: user.tenantId },
+      include: {
+        universities: true,
+        documents: { orderBy: { updatedAt: 'desc' } },
+        tasks: {
+          include: { comments: { orderBy: { createdAt: 'asc' } } },
+          orderBy: { dueDate: 'asc' }
+        },
+        milestones: { orderBy: { date: 'asc' } },
+        practiceRecords: { orderBy: { createdAt: 'desc' } }
+      }
+    }),
+    getTemplates(),
+    getActivityLogs(params.id)
+  ]);
   const questionBank = JSON.parse(JSON.stringify(rawQuestionBank));
-
-  // DBから生徒情報を取得（自テナントの生徒のみ閲覧可能）
-  const dbStudent = await prisma.studentProfile.findFirst({
-    where: { id: params.id, tenantId: user.tenantId },
-    include: {
-      universities: true,
-      documents: { orderBy: { updatedAt: 'desc' } },
-      tasks: {
-        include: { comments: { orderBy: { createdAt: 'asc' } } },
-        orderBy: { dueDate: 'asc' }
-      },
-      milestones: { orderBy: { date: 'asc' } },
-      practiceRecords: { orderBy: { createdAt: 'desc' } }
-    }
-  });
 
   if (!dbStudent) {
     notFound();
   }
-
-  const templates = await getTemplates();
-  const logs = await getActivityLogs(params.id);
 
   const student = {
     id: dbStudent.id,

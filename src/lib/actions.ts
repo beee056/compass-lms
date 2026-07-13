@@ -15,13 +15,18 @@ import {
   toClientError,
   ValidationError
 } from "./authz";
+import { endOfDayJST, startOfDayJST } from "./dates";
 
-// 日付計算ヘルパー
+// 日付計算ヘルパー: N日後のJST終業時刻(23:59)を締切として返す
 function getFutureDate(days: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const target = new Date(Date.now() + days * 86_400_000);
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(target);
+  return endOfDayJST(ymd)!;
 }
 
 // ID生成ヘルパー（推測不能なUUIDベース。連番・タイムスタンプ由来のIDはIDORを容易にするため使わない）
@@ -47,9 +52,18 @@ function validateOptionalEmail(value: string | null | undefined, label: string):
   return result.data;
 }
 
-function parseDateInput(dateStr: string): Date {
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) throw new ValidationError("日付の形式が不正です");
+// 締切(期限日): その日の終わり23:59:59 JST として保存
+function parseDueDate(dueDateStr?: string | null): Date | null {
+  if (!dueDateStr) return null;
+  const d = endOfDayJST(dueDateStr);
+  if (!d) throw new ValidationError("日付の形式が不正です");
+  return d;
+}
+
+// マイルストーン等の予定日: その日の始まり00:00 JST として保存
+function parseDayStart(dateStr: string): Date {
+  const d = startOfDayJST(dateStr);
+  if (!d) throw new ValidationError("日付の形式が不正です");
   return d;
 }
 
@@ -359,12 +373,7 @@ export async function createTask(studentId: string, title: string, dueDateStr?: 
     await assertStudentAccess(user, studentId);
     const validTitle = validateText(title, "タスク名");
 
-    // 日付を調整
-    let adjustedDueDate = null;
-    if (dueDateStr) {
-      adjustedDueDate = parseDateInput(dueDateStr);
-      adjustedDueDate.setHours(23, 59, 59, 999);
-    }
+    const adjustedDueDate = parseDueDate(dueDateStr);
 
     const newTask = await prisma.task.create({
       data: {
@@ -457,12 +466,7 @@ export async function updateTask(taskId: string, title: string, dueDateStr?: str
     const task = await findAuthorizedTask(user, taskId);
     const validTitle = validateText(title, "タスク名");
 
-    // 日付を調整
-    let adjustedDueDate = null;
-    if (dueDateStr) {
-      adjustedDueDate = parseDateInput(dueDateStr);
-      adjustedDueDate.setHours(23, 59, 59, 999);
-    }
+    const adjustedDueDate = parseDueDate(dueDateStr);
 
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
@@ -490,11 +494,7 @@ export async function updateDocument(documentId: string, title: string, dueDateS
     const doc = await findAuthorizedDocument(user, documentId);
     const validTitle = validateText(title, "書類名");
 
-    let adjustedDueDate = null;
-    if (dueDateStr) {
-      adjustedDueDate = parseDateInput(dueDateStr);
-      adjustedDueDate.setHours(23, 59, 59, 999);
-    }
+    const adjustedDueDate = parseDueDate(dueDateStr);
 
     const oldTitle = doc.title;
 
@@ -531,7 +531,7 @@ export async function createMilestone(studentId: string, title: string, dateStr:
         id: generateId('milestone'),
         studentProfileId: studentId,
         title: validTitle,
-        date: parseDateInput(dateStr),
+        date: parseDayStart(dateStr),
         type,
         status: "TODO"
       }
@@ -659,14 +659,9 @@ export async function deleteStudent(studentId: string) {
     assertMentor(user);
     await assertStudentAccess(user, studentId);
 
-    // 関連データを物理削除（途中失敗で中途半端に消えないようトランザクション化）
-    await prisma.$transaction([
-      prisma.university.deleteMany({ where: { studentProfileId: studentId } }),
-      prisma.task.deleteMany({ where: { studentProfileId: studentId } }),
-      prisma.milestone.deleteMany({ where: { studentProfileId: studentId } }),
-      prisma.document.deleteMany({ where: { studentProfileId: studentId } }),
-      prisma.studentProfile.delete({ where: { id: studentId } })
-    ]);
+    // 関連データ(志望校・タスク・コメント・マイルストーン・書類・練習記録・解答・ログ)は
+    // スキーマの onDelete: Cascade で自動削除されるため、プロフィール本体を消すだけでよい。
+    await prisma.studentProfile.delete({ where: { id: studentId } });
 
     revalidatePath("/");
     return { success: true };
@@ -801,7 +796,8 @@ export async function addTaskComment(taskId: string, content: string) {
         taskId,
         content: validContent,
         authorId: user.id,
-        authorName: user.name
+        authorName: user.name,
+        authorRole: user.role === "STUDENT" ? "STUDENT" : "MENTOR"
       }
     });
 
@@ -862,7 +858,7 @@ export async function createStudentTask(title: string, dueDateStr?: string) {
     }
     const validTitle = validateText(title, "タスク名");
 
-    const dueDate = dueDateStr ? parseDateInput(dueDateStr) : null;
+    const dueDate = parseDueDate(dueDateStr);
 
     const task = await prisma.task.create({
       data: {

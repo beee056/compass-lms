@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Tenant {
-  id        String           @id
+  id        String           @id @default(cuid())
   name      String
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
@@ -20,7 +20,7 @@ model Tenant {
 }
 
 model User {
-  id             String          @id
+  id             String          @id @default(cuid())
   clerkId        String          @unique
   tenantId       String
   tenant         Tenant          @relation(fields: [tenantId], references: [id])
@@ -29,11 +29,14 @@ model User {
   email          String          @unique
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  studentProfile StudentProfile?
+  // 生徒本人のログインアカウント（1:1）
+  studentProfile StudentProfile? @relation("StudentLogin")
+
+  @@index([tenantId])
 }
 
 model StudentProfile {
-  id             String       @id
+  id             String       @id @default(cuid())
   tenantId       String
   tenant         Tenant       @relation(fields: [tenantId], references: [id])
   name           String
@@ -46,7 +49,7 @@ model StudentProfile {
   parentEmail    String?      // 保護者メールアドレス
   studentEmail   String?      @unique // 生徒招待・ログイン用メアド
   userId         String?      @unique // サインアップ後に紐づくUser ID
-  user           User?        @relation(fields: [userId], references: [id])
+  user           User?        @relation("StudentLogin", fields: [userId], references: [id])
   status         String       @default("ACTIVE") // "ACTIVE" (在籍生) / "ARCHIVED" (卒業生)
   universities   University[]
   tasks          Task[]
@@ -57,21 +60,26 @@ model StudentProfile {
   logs           ActivityLog[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, status])
 }
 
 model University {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   name             String
   department       String
   method           String       // e.g., "総合型選抜"
   milestones       Milestone[]
   tasks            Task[]
+
+  @@index([studentProfileId])
 }
 
 model Milestone {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   universityId     String?
@@ -80,10 +88,13 @@ model Milestone {
   date             DateTime
   status           String         // "TODO", "DONE"
   type             String         // "書類提出", "面接"
+
+  @@index([studentProfileId])
+  @@index([universityId])
 }
 
 model Task {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   universityId     String?
@@ -95,52 +106,67 @@ model Task {
   progress         Int            @default(0) // 0-100% for documents
   isSelfCreated    Boolean        @default(false) // 生徒自身が作成したタスクかどうか
   comments         TaskComment[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @default(now()) @updatedAt
+
+  @@index([studentProfileId, completed, dueDate])
+  @@index([universityId])
 }
 
 model TaskComment {
-  id         String   @id
+  id         String   @id @default(cuid())
   taskId     String
-  task       Task     @relation(fields: [taskId], references: [id])
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   content    String
   authorId   String   // userId (メンターまたは生徒)
   authorName String   // キャッシュ用（API呼び出しを減らすため）
+  authorRole String   @default("MENTOR") // "STUDENT" / "MENTOR" — 要返信バッジ判定用
   createdAt  DateTime @default(now())
+
+  @@index([taskId])
 }
 
 model TaskTemplate {
-  id        String         @id
+  id        String         @id @default(cuid())
   tenantId  String
   tenant    Tenant         @relation(fields: [tenantId], references: [id])
   name      String         // "早慶 総合型", "指定校推薦" など
   items     TemplateItem[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+
+  @@index([tenantId])
 }
 
 model TemplateItem {
-  id         String       @id
+  id         String       @id @default(cuid())
   templateId String
-  template   TaskTemplate @relation(fields: [templateId], references: [id])
+  template   TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   title      String
   type       String       // "TODO", "DOCUMENT"
   daysOffset Int          // 追加日からの相対日数（例: 7日後）
+
+  @@index([templateId])
 }
 
 model ActivityLog {
-  id               String          @id
+  id               String          @id @default(cuid())
   tenantId         String
   tenant           Tenant          @relation(fields: [tenantId], references: [id])
   studentProfileId String?
-  studentProfile   StudentProfile? @relation(fields: [studentProfileId], references: [id])
+  studentProfile   StudentProfile? @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   action           String          // "TASK_COMPLETED", "DOCUMENT_ADDED", "COMMENT_ADDED"
   details          String          // 内容の説明
   createdAt        DateTime        @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([studentProfileId])
 }
 
 model Document {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id])
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   title            String
   url              String?        // Google Docs/Drive url
   type             String         // "志望理由書", "活動報告書", "その他"
@@ -148,12 +174,15 @@ model Document {
   content          String?        @db.Text
   isInternal       Boolean        @default(false)
   isArchived       Boolean        @default(false)
+  status           String         @default("DRAFT") // "DRAFT"(下書き) "SUBMITTED"(生徒提出済) "REVIEWING"(レビュー中) "DONE"(完了)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+
+  @@index([studentProfileId, isArchived])
 }
 
 model PracticeRecord {
-  id               String         @id
+  id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   type             String         // "小論文", "志望理由書"
@@ -162,6 +191,8 @@ model PracticeRecord {
   score            Int?           // AI採点スコア
   feedback         String         // AIフィードバック
   createdAt        DateTime       @default(now())
+
+  @@index([studentProfileId])
 }
 
 model Course {
@@ -185,15 +216,17 @@ model Lesson {
   steps       LessonStep[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  @@index([courseId])
 }
 
 model LessonStep {
   id          String       @id @default(cuid())
   lessonId    String
   lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  title       String       
-  description String       @db.Text 
-  prompt      String       @db.Text 
+  title       String
+  description String       @db.Text
+  prompt      String       @db.Text
   hint        String?      @db.Text
   placeholder String?      @db.Text
   goodExample String?      @db.Text
@@ -205,6 +238,8 @@ model LessonStep {
   answers     StepAnswer[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  @@index([lessonId])
 }
 
 model StepAnswer {
@@ -217,20 +252,25 @@ model StepAnswer {
   feedbacks        AIFeedback[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+
+  @@unique([stepId, studentProfileId])
+  @@index([studentProfileId])
 }
 
 model AIFeedback {
   id           String     @id @default(cuid())
   stepAnswerId String
   stepAnswer   StepAnswer @relation(fields: [stepAnswerId], references: [id], onDelete: Cascade)
-  content      String     @db.Text 
-  score        Int?       
+  content      String     @db.Text
+  score        Int?
   createdAt    DateTime   @default(now())
+
+  @@index([stepAnswerId])
 }
 
 model QuestionBank {
   id          String   @id @default(cuid())
-  category    String   
+  category    String
   title       String
   prompt      String   @db.Text
   createdAt   DateTime @default(now())

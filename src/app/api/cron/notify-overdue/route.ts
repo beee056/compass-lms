@@ -66,7 +66,13 @@ export async function GET(request: Request) {
       await sendEmail(email, subject, body);
     }
 
-    return NextResponse.json({ success: true, count: userTaskMap.size });
+    // アクティビティログの保持ポリシー: 12ヶ月より古いログを削除して肥大化を防ぐ
+    const retentionCutoff = new Date(Date.now() - 365 * 86_400_000);
+    const purged = await prisma.activityLog.deleteMany({
+      where: { createdAt: { lt: retentionCutoff } }
+    });
+
+    return NextResponse.json({ success: true, notified: userTaskMap.size, purgedLogs: purged.count });
   } catch (error: any) {
     console.error('Failed to run cron job:', error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });

@@ -42,3 +42,10 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# local debug / scratch artifacts
+*.log
+dev-demo.*
+models.json
+check-models.js
+/scratch/

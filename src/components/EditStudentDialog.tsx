@@ -21,6 +21,7 @@ interface EditStudentDialogProps {
     grade?: string;
     phone?: string;
     parentEmail?: string;
+    studentEmail?: string;
     status?: string;
   };
   trigger?: React.ReactNode;

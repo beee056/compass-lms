@@ -31,9 +31,12 @@ function remove(id: number) {
   emit();
 }
 
-function push(type: ToastType, text: string): number {
+// サーバーアクションの result.error は string | undefined のことがあるため広めに受ける
+type ToastText = string | number | null | undefined;
+
+function push(type: ToastType, text: ToastText): number {
   const id = ++counter;
-  toasts = [...toasts, { id, type, text }];
+  toasts = [...toasts, { id, type, text: text == null ? "" : String(text) }];
   emit();
   if (typeof window !== "undefined") {
     window.setTimeout(() => remove(id), DURATION_MS);
@@ -43,12 +46,12 @@ function push(type: ToastType, text: string): number {
 
 // sonner 互換のトースト API
 export const toast = Object.assign(
-  (text: string) => push("message", text),
+  (text: ToastText) => push("message", text),
   {
-    success: (text: string) => push("success", text),
-    error: (text: string) => push("error", text),
-    info: (text: string) => push("info", text),
-    message: (text: string) => push("message", text),
+    success: (text: ToastText) => push("success", text),
+    error: (text: ToastText) => push("error", text),
+    info: (text: ToastText) => push("info", text),
+    message: (text: ToastText) => push("message", text),
     dismiss: (id?: number) => {
       if (id == null) {
         toasts = [];

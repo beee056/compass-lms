@@ -170,6 +170,9 @@ export async function getCurrentUser() {
     }
   }
 
+  // ここに到達して user が null なのは想定外（上のロジックで必ず生成/取得される）。
+  // 返り値の型を非nullに確定させ、呼び出し側(assertMentor等)の型エラーを防ぐ。
+  if (!user) throw new Error("Unauthorized");
   return user;
 }
 

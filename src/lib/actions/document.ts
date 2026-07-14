@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { getAIModel } from "../ai-model";
 import { getCurrentUser } from "../actions";
 import { assertMentor, assertStudentAccess, findAuthorizedDocument, toClientError } from "../authz";
 import { endOfDayJST } from "../dates";
@@ -34,7 +34,7 @@ export async function generateDocumentDraft(studentId: string, type: string, uni
 
     // AIで初稿を生成
     const { text: draftContent } = await generateText({
-      model: google("gemini-1.5-pro"),
+      model: getAIModel(),
       system: documentDraftPrompt,
       prompt: `
 【書類の種類】

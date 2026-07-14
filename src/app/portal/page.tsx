@@ -9,11 +9,15 @@ import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import PracticeSection from "@/components/PracticeSection";
 
+// AI添削（このページから呼ばれるServer Action）がタイムアウトしないよう上限を延長
+export const maxDuration = 60;
+
 export default async function StudentPortalPage() {
   const user = await getCurrentUser();
 
-  // 問題バンクの取得 (Client Componentへの受け渡しのためシリアライズ)
+  // 問題バンクの取得: 共通問題(tenantId=null) + 自テナントのAI生成問題
   const rawQuestionBank = await prisma.questionBank.findMany({
+    where: { OR: [{ tenantId: null }, { tenantId: user.tenantId }] },
     orderBy: { createdAt: "desc" }
   });
   const questionBank = JSON.parse(JSON.stringify(rawQuestionBank));

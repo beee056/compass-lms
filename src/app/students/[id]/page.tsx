@@ -13,6 +13,10 @@ import MilestoneSection from "@/components/MilestoneSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
 import PracticeSection from "@/components/PracticeSection";
 
+// AI添削・問題生成（このページから呼ばれるServer Action）が
+// Vercelの既定タイムアウトを超えないよう上限を延長
+export const maxDuration = 60;
+
 export default async function StudentDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (user.role === "STUDENT") {
@@ -21,7 +25,11 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
 
   // 独立した4クエリを並列取得（直列awaitによる体感遅延を解消）
   const [rawQuestionBank, dbStudent, templates, logs] = await Promise.all([
-    prisma.questionBank.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.questionBank.findMany({
+      // 共通問題(tenantId=null) + 自テナントのAI生成問題
+      where: { OR: [{ tenantId: null }, { tenantId: user.tenantId }] },
+      orderBy: { createdAt: "desc" }
+    }),
     prisma.studentProfile.findFirst({
       where: { id: params.id, tenantId: user.tenantId },
       include: {

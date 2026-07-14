@@ -21,8 +21,8 @@ export default async function Header() {
 
   return (
     <header className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-4 border-b border-border bg-white/90 px-4 shadow-sm backdrop-blur sm:px-6">
-      <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" aria-label="Scholar Compass ホーム">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-foreground text-white">
+      <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity" aria-label="Scholar Compass ホーム">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-white">
           <Compass className="h-5 w-5" />
         </div>
         <div className="leading-none">
@@ -31,10 +31,10 @@ export default async function Header() {
         </div>
       </Link>
 
-      <nav aria-label="メインナビゲーション" className="flex items-center gap-3 sm:gap-5">
+      <nav aria-label="メインナビゲーション" className="flex min-w-0 items-center gap-2 sm:gap-5">
         <Link
           href="/demo"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
+          className="hidden sm:inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
         >
           <MonitorPlay className="h-4 w-4" />
           <span className="hidden sm:inline">公開デモ</span>
@@ -43,7 +43,7 @@ export default async function Header() {
         {userId ? (
           <>
             {user?.role === "STUDENT" ? (
-              <div className="flex items-center gap-5 mr-4">
+              <div className="flex items-center gap-3 sm:gap-5 sm:mr-4">
                 <NavLink href="/portal" exact title="ポータル" baseClassName="hover:text-emerald-600 transition-colors p-1 rounded-md text-emerald-500" activeClassName="text-emerald-700 bg-emerald-50">
                   <LayoutGrid className="h-5 w-5" />
                 </NavLink>
@@ -53,20 +53,20 @@ export default async function Header() {
                 <NavLink href="/materials" title="学習資料・ガイダンス" baseClassName="hover:text-emerald-600 transition-colors p-1 rounded-md text-emerald-500" activeClassName="text-emerald-700 bg-emerald-50">
                   <BookOpen className="h-5 w-5" />
                 </NavLink>
-                <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm ml-2">
-                  <span className="text-sm font-bold text-emerald-700">{user.name}</span>
-                  <span className="text-xs font-semibold text-emerald-500">さんのマイページ</span>
+                <div className="hidden md:flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 border border-emerald-100 shadow-sm ml-2 max-w-[220px]">
+                  <span className="truncate whitespace-nowrap text-sm font-bold text-emerald-700">{user.name}</span>
+                  <span className="shrink-0 text-xs font-semibold text-emerald-500">さんのマイページ</span>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 border border-indigo-100 shadow-sm">
-                <span className="text-sm font-bold text-indigo-700">{user?.tenant?.name || `${user?.name}さんの指導`}</span>
+              <div className="hidden md:flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 border border-indigo-100 shadow-sm max-w-[240px]">
+                <span className="truncate whitespace-nowrap text-sm font-bold text-indigo-700">{user?.tenant?.name || `${user?.name}さんの指導`}</span>
               </div>
             )}
 
             {/* ナビゲーションリンクの有効化 (メンターのみ) */}
             {user?.role !== "STUDENT" && (
-              <div className="flex items-center gap-5 text-slate-500 mr-4">
+              <div className="flex items-center gap-3 sm:gap-5 text-slate-500 sm:mr-4">
                 <NavLink href="/" exact title="ダッシュボード">
                   <LayoutGrid className="h-5 w-5" />
                 </NavLink>

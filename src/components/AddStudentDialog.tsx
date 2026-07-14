@@ -5,12 +5,13 @@ import { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { createStudent } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function AddStudentDialog() {
+export default function AddStudentDialog({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
@@ -34,7 +35,7 @@ export default function AddStudentDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6 flex items-center gap-2 shadow-sm font-bold h-12">
+          <Button className={cn("bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6 flex items-center justify-center gap-2 shadow-sm font-bold h-12", className)}>
             <Plus className="h-5 w-5" />
             生徒を追加
           </Button>

@@ -31,8 +31,14 @@ export default function CourseBrowser({ courses, studentProfileId }: { courses: 
 
   if (courses.length === 0) {
     return (
-      <div className="text-center p-12 text-slate-500 bg-white rounded-xl shadow-sm border border-slate-200">
-        教材がまだ登録されていません。（デプロイ後、Seedを実行してください）
+      <div className="mx-auto flex max-w-md flex-col items-center rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+          <BookOpen className="h-7 w-7" />
+        </div>
+        <p className="text-lg font-bold text-slate-800">教材はまだ準備中です</p>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          カリキュラムが公開されると、ここに順番に並びます。もうしばらくお待ちください。
+        </p>
       </div>
     );
   }

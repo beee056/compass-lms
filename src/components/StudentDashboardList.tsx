@@ -72,23 +72,23 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
           />
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-          <div className="flex w-full justify-center rounded-md border border-[#d8dee4] bg-[#fbfcf8] p-1 shadow-none sm:w-auto">
-            <button 
+        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
+          <div className="flex w-full rounded-md border border-[#d8dee4] bg-[#fbfcf8] p-1 shadow-none md:w-auto">
+            <button
               onClick={() => setStatusFilter("ACTIVE")}
-              className={`w-1/2 rounded px-6 py-2.5 text-center text-sm font-bold transition-all sm:w-auto ${
-                statusFilter === "ACTIVE" 
-                  ? "bg-white text-[#3346a3] shadow-sm" 
+              className={`flex-1 rounded px-6 py-2.5 text-center text-sm font-bold transition-all md:flex-none ${
+                statusFilter === "ACTIVE"
+                  ? "bg-white text-[#3346a3] shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
               在籍生
             </button>
-            <button 
+            <button
               onClick={() => setStatusFilter("ARCHIVED")}
-              className={`w-1/2 rounded px-6 py-2.5 text-center text-sm font-bold transition-all sm:w-auto ${
-                statusFilter === "ARCHIVED" 
-                  ? "bg-white text-[#3346a3] shadow-sm" 
+              className={`flex-1 rounded px-6 py-2.5 text-center text-sm font-bold transition-all md:flex-none ${
+                statusFilter === "ARCHIVED"
+                  ? "bg-white text-[#3346a3] shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -96,30 +96,32 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
             </button>
           </div>
 
-          <select
-            value={phaseFilter}
-            onChange={(e) => setPhaseFilter(e.target.value)}
-            aria-label="フェーズで絞り込み"
-            className="h-11 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30"
-          >
-            <option value="ALL">すべてのフェーズ</option>
-            {phases.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+          <div className="grid w-full grid-cols-2 gap-3 md:flex md:w-auto md:gap-4">
+            <select
+              value={phaseFilter}
+              onChange={(e) => setPhaseFilter(e.target.value)}
+              aria-label="フェーズで絞り込み"
+              className="h-11 w-full min-w-0 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30 md:w-auto"
+            >
+              <option value="ALL">すべてのフェーズ</option>
+              {phases.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortKey)}
-            aria-label="並び替え"
-            className="h-11 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30"
-          >
-            <option value="stale">更新が古い順（要フォロー）</option>
-            <option value="recent">更新が新しい順</option>
-            <option value="name">名前順</option>
-          </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              aria-label="並び替え"
+              className="h-11 w-full min-w-0 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30 md:w-auto"
+            >
+              <option value="stale">更新が古い順（要フォロー）</option>
+              <option value="recent">更新が新しい順</option>
+              <option value="name">名前順</option>
+            </select>
+          </div>
 
-          <AddStudentDialog />
+          <AddStudentDialog className="w-full md:w-auto" />
         </div>
       </div>
 

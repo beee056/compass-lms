@@ -172,6 +172,44 @@ export default function MentorCommandCenter({
     .sort((a, b) => (b.daysSinceActivity ?? 0) - (a.daysSinceActivity ?? 0));
   const replyNeededTasks = tasks.filter((t) => t.needsReply && !t.completed);
 
+  // 生徒が1人もいないときは、空のダッシュボードではなくオンボーディングを表示する
+  if (students.length === 0) {
+    const onboardingSteps = [
+      { n: "1", label: "生徒を登録", icon: UsersRound },
+      { n: "2", label: "志望校を設定", icon: Target },
+      { n: "3", label: "タスクを配布", icon: FileText }
+    ];
+    return (
+      <div className="w-full animate-in fade-in duration-500 pb-20 text-[#17202a]">
+        <div className="mx-auto max-w-2xl rounded-lg border border-[#d8dee4] bg-[#fbfcf8] px-6 py-16 text-center md:py-20">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#eef1ea] text-[#3346a3]">
+            <UsersRound className="h-8 w-8" />
+          </div>
+          <h1 className="text-2xl font-black text-[#17202a] md:text-3xl">最初の生徒を登録しましょう</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm font-medium leading-7 text-slate-600">
+            生徒を登録すると、締切・要介入・面談の順番が毎朝この指導ボードに自動で並びます。
+          </p>
+          <div className="mt-7 flex justify-center">
+            <AddStudentDialog />
+          </div>
+          <div className="mx-auto mt-10 grid max-w-lg gap-3 sm:grid-cols-3">
+            {onboardingSteps.map((step) => (
+              <div key={step.n} className="rounded-lg border border-[#d8dee4] bg-white p-4 text-left">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef1ea] text-sm font-black text-[#3346a3]">
+                  {step.n}
+                </div>
+                <p className="mt-3 flex items-center gap-1.5 text-sm font-black text-[#17202a]">
+                  <step.icon className="h-4 w-4 text-slate-400" />
+                  {step.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full animate-in fade-in duration-500 space-y-8 pb-20 text-[#17202a]">
       {(stalledStudents.length > 0 || replyNeededTasks.length > 0) && (
@@ -518,12 +556,12 @@ export default function MentorCommandCenter({
           </h2>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-[#fbfcf8] p-4 ring-1 ring-[#d8dee4]">
-              <p className="text-xs font-bold text-slate-500">未完了期限</p>
-              <p className="mt-2 text-2xl font-black">{upcomingTasks.length}</p>
+              <p className="text-xs font-bold text-slate-500">停滞生徒</p>
+              <p className="mt-2 text-2xl font-black">{stalledStudents.length}</p>
             </div>
             <div className="rounded-lg bg-[#fbfcf8] p-4 ring-1 ring-[#d8dee4]">
-              <p className="text-xs font-bold text-slate-500">生徒数</p>
-              <p className="mt-2 text-2xl font-black">{activeStudents.length}</p>
+              <p className="text-xs font-bold text-slate-500">返信待ち</p>
+              <p className="mt-2 text-2xl font-black">{replyNeededTasks.length}</p>
             </div>
           </div>
           <Link
@@ -539,7 +577,6 @@ export default function MentorCommandCenter({
       <section className="rounded-lg border border-[#d8dee4] bg-white p-5 md:p-6">
         <div className="mb-5 flex flex-col justify-between gap-2 md:flex-row md:items-end">
           <div>
-            <p className="text-xs font-black uppercase text-[#3346a3]">Student list</p>
             <h2 className="text-2xl font-black">生徒一覧</h2>
           </div>
           <p className="text-sm font-semibold text-slate-500">

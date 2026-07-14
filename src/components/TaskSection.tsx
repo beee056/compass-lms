@@ -109,14 +109,15 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
     
     setIsSubmittingComment(true);
     const result = await addTaskComment(taskId, commentInput);
-    if (result.success) {
+    if (result.success && result.comment) {
+      const newComment = result.comment;
       setCommentInput("");
       // 楽観的UI更新（または revalidatePath に任せるか。今回は再レンダーを待つより即時反映させる）
       setTasks(prev => prev.map(t => {
         if (t.id === taskId) {
           return {
             ...t,
-            comments: [...(t.comments || []), result.comment]
+            comments: [...(t.comments || []), newComment]
           };
         }
         return t;

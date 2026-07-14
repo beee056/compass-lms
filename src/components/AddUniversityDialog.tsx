@@ -86,7 +86,7 @@ export default function AddUniversityDialog({ studentId, templates = [] }: AddUn
             {templates.length > 0 && (
               <div className="grid gap-2 mt-2">
                 <Label htmlFor="template" className="text-slate-700 font-semibold text-sm">適用するタスクテンプレート</Label>
-                <Select value={templateId} onValueChange={setTemplateId}>
+                <Select value={templateId} onValueChange={(val) => setTemplateId(val ?? "none")}>
                   <SelectTrigger className="bg-white">
                     <SelectValue placeholder="テンプレートを選択" />
                   </SelectTrigger>

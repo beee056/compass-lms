@@ -44,11 +44,9 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm">
-          <Plus className="h-4 w-4" />
-          新規書類を作成
-        </button>
+      <DialogTrigger render={<button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm" />}>
+        <Plus className="h-4 w-4" />
+        新規書類を作成
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] bg-white h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -87,7 +85,7 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
             {/* 関連志望校の選択 */}
             <div className="grid gap-2">
               <Label htmlFor="selectedUni" className="text-slate-700 font-semibold text-sm">対象の志望校</Label>
-              <Select value={selectedUni} onValueChange={(val) => setSelectedUni(val)}>
+              <Select value={selectedUni} onValueChange={(val) => setSelectedUni(val ?? "共通")}>
                 <SelectTrigger className="border-slate-200 bg-white">
                   <SelectValue placeholder="志望校を選択" />
                 </SelectTrigger>

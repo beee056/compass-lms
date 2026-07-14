@@ -106,7 +106,7 @@ export async function getCurrentUser() {
         // 二重チェック
         const existing = await tx.user.findUnique({
           where: { clerkId: userId },
-          include: { tenant: true }
+          include: { tenant: true, studentProfile: true }
         });
         if (existing) return existing;
 
@@ -124,7 +124,7 @@ export async function getCurrentUser() {
               name,
               email
             },
-            include: { tenant: true }
+            include: { tenant: true, studentProfile: true }
           });
           // StudentProfile側にも紐付け
           await tx.studentProfile.update({
@@ -151,7 +151,7 @@ export async function getCurrentUser() {
               name,
               email
             },
-            include: { tenant: true }
+            include: { tenant: true, studentProfile: true }
           });
         }
       });
@@ -161,7 +161,7 @@ export async function getCurrentUser() {
       // 万が一、競合して別プロセスで作成された場合などに備えて、もう一度引き直す
       user = await prisma.user.findUnique({
         where: { clerkId: userId },
-        include: { tenant: true }
+        include: { tenant: true, studentProfile: true }
       });
 
       if (!user) {

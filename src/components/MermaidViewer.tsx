@@ -59,17 +59,15 @@ export default function MermaidViewer({ chart }: { chart: string }) {
 
   return (
     <Dialog>
-      <DialogTrigger asChild>
-        <div className="relative group cursor-pointer my-8">
-          <div 
-            ref={containerRef} 
-            className="flex justify-center p-6 bg-slate-50 border border-slate-200 rounded-xl shadow-inner overflow-x-auto [&>svg]:w-full [&>svg]:max-w-4xl [&>svg]:h-auto transition-all duration-200 group-hover:border-indigo-300 group-hover:shadow-md"
-            dangerouslySetInnerHTML={{ __html: svg }} 
-          />
-          <div className="absolute top-4 right-4 p-2 bg-indigo-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity transform scale-95 group-hover:scale-100 flex items-center gap-2">
-            <ZoomIn className="h-4 w-4" />
-            <span className="text-xs font-bold pr-1">拡大表示</span>
-          </div>
+      <DialogTrigger render={<div className="relative group cursor-pointer my-8" />}>
+        <div
+          ref={containerRef}
+          className="flex justify-center p-6 bg-slate-50 border border-slate-200 rounded-xl shadow-inner overflow-x-auto [&>svg]:w-full [&>svg]:max-w-4xl [&>svg]:h-auto transition-all duration-200 group-hover:border-indigo-300 group-hover:shadow-md"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+        <div className="absolute top-4 right-4 p-2 bg-indigo-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity transform scale-95 group-hover:scale-100 flex items-center gap-2">
+          <ZoomIn className="h-4 w-4" />
+          <span className="text-xs font-bold pr-1">拡大表示</span>
         </div>
       </DialogTrigger>
       

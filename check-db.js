@@ -1,15 +1,19 @@
-const { PrismaClient } = require('@prisma/client');
-const fs = require('fs');
-const prisma = new PrismaClient({ datasources: { db: { url: 'postgresql://neondb_owner:npg_u31aFhwRjAOW@ep-rapid-rain-a1v7vshn-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require' } } });
+const { Client } = require('pg');
+const dotenv = require('dotenv');
+dotenv.config();
 
-async function main() {
-  try {
-    const users = await prisma.user.findMany();
-    const students = await prisma.studentProfile.findMany();
-    fs.writeFileSync('db-output.txt', `USERS: ${users.length}\nSTUDENTS: ${students.length}\n`);
-  } catch(e) {
-    fs.writeFileSync('db-output.txt', `ERROR: ${e.message}\n${e.stack}`);
-  }
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+});
+
+async function run() {
+  await client.connect();
+  const res = await client.query('SELECT * FROM "User"');
+  console.log("Users:", res.rows);
+  
+  const res2 = await client.query('SELECT * FROM "StudentProfile"');
+  console.log("Profiles:", res2.rows);
+  
+  await client.end();
 }
-
-main().finally(() => prisma.$disconnect());
+run().catch(console.error);

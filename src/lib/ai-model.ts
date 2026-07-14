@@ -9,8 +9,11 @@
 import { google } from "@ai-sdk/google";
 import { anthropic } from "@ai-sdk/anthropic";
 
+// 既定モデル。gemini-2.5系は非推奨化済みのため3.5系を既定とする
+// （2026-06時点でAPIのモデル一覧により gemini-3.5-flash が現行と確認済み。
+//   モデル改廃があった場合はコードを変えずに AI_MODEL 環境変数で上書きする）
 const DEFAULTS: Record<string, string> = {
-  google: "gemini-2.5-flash",
+  google: "gemini-3.5-flash",
   anthropic: "claude-sonnet-5"
 };
 

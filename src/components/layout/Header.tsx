@@ -32,13 +32,15 @@ export default async function Header() {
       </Link>
 
       <nav aria-label="メインナビゲーション" className="flex min-w-0 items-center gap-2 sm:gap-5">
-        <Link
-          href="/demo"
-          className="hidden sm:inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
-        >
-          <MonitorPlay className="h-4 w-4" />
-          <span className="hidden sm:inline">公開デモ</span>
-        </Link>
+        {!userId && (
+          <Link
+            href="/demo"
+            className="hidden sm:inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            <MonitorPlay className="h-4 w-4" />
+            <span className="hidden sm:inline">公開デモ</span>
+          </Link>
+        )}
 
         {userId ? (
           <>

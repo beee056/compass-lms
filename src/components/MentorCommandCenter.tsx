@@ -425,7 +425,7 @@ export default function MentorCommandCenter({
                     {index < activePhaseIndex ? <CheckCircle2 className="h-5 w-5" /> : index + 1}
                   </div>
                   <p className="mt-4 text-xs font-black text-[#3346a3]">STEP {index + 1}</p>
-                  <h3 className="mt-1 font-black">{phase}</h3>
+                  <h3 className="mt-1 whitespace-nowrap text-sm font-black">{phase}</h3>
                   <p className="mt-3 rounded-md bg-[#eef1ea] px-2 py-1 text-xs font-black text-[#17202a]">
                     {getRouteState(index, activePhaseIndex)}
                   </p>

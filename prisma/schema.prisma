@@ -274,7 +274,7 @@ model QuestionBank {
   category    String
   title       String
   prompt      String   @db.Text
-  source      String   @default("MANUAL") // "MANUAL" / "AI_GENERATED"
+  source      String   @default("MANUAL") // "MANUAL" / "AI_GENERATED" / "NOTEBOOKLM"
   university  String?  // 過去問傾向の対象大学（AI生成時）
   modelAnswer String?  @db.Text // 模範解答の要点・採点ポイント（メンター/採点参照用）
   createdAt   DateTime @default(now())

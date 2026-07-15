@@ -211,7 +211,7 @@ export default function PracticeSection({
                     <option value="">練習したいテーマを選んでください</option>
                     {questionBank.map((q: any) => (
                       <option key={q.id} value={q.id}>
-                        [{q.category}]{q.source === "AI_GENERATED" ? "（AI生成）" : ""} {q.title}
+                        [{q.category}]{q.source === "AI_GENERATED" ? "（AI生成）" : q.source === "NOTEBOOKLM" ? "（NotebookLM）" : ""} {q.title}
                       </option>
                     ))}
                   </select>

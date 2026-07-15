@@ -96,7 +96,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
             </button>
           </div>
 
-          <div className="grid w-full grid-cols-2 gap-3 md:flex md:w-auto md:gap-4">
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:flex md:w-auto md:gap-4">
             <select
               value={phaseFilter}
               onChange={(e) => setPhaseFilter(e.target.value)}
@@ -135,12 +135,12 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
         ) : (
           sortedStudents.map((student) => (
             <div key={student.id} className="block group relative">
-              <Card className="relative flex min-h-[260px] flex-col overflow-hidden border-[#d8dee4] bg-white p-8 shadow-sm transition-all duration-300 group-hover:border-[#3346a3]/40 group-hover:shadow-[0_8px_24px_rgba(23,32,42,0.06)]">
+              <Card className="relative flex min-h-[260px] flex-col overflow-hidden border-[#d8dee4] bg-white p-5 shadow-sm transition-all duration-300 group-hover:border-[#3346a3]/40 group-hover:shadow-[0_8px_24px_rgba(23,32,42,0.06)] sm:p-8">
                 <Link href={`/students/${student.id}`} className="absolute inset-0 z-0" aria-label={`${student.name}の詳細を見る`} />
 
-                <div className="flex justify-between items-start mb-4 relative z-10 pointer-events-none">
-                  <div className="pr-10">
-                    <h3 className="flex items-center gap-2 text-2xl font-bold tracking-normal text-[#17202a] transition-colors group-hover:text-[#3346a3]">
+                <div className="relative z-10 mb-4 flex items-start justify-between gap-2 pointer-events-none">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-normal text-[#17202a] transition-colors group-hover:text-[#3346a3] sm:text-2xl">
                       <Link href={`/students/${student.id}`} className="hover:underline pointer-events-auto relative z-20">
                         {student.name}
                       </Link>
@@ -159,15 +159,16 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                       </div>
                     )}
                   </div>
-                  <div className="flex items-start gap-2 relative z-20 pointer-events-auto">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md border border-[#d8dee4] bg-[#fbfcf8] text-base font-bold text-slate-500 transition-all group-hover:border-[#3346a3]/30 group-hover:bg-[#eef1ea] group-hover:text-[#3346a3]">
+                  <div className="relative z-20 flex shrink-0 items-start gap-1 pointer-events-auto sm:gap-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-[#d8dee4] bg-[#fbfcf8] text-sm font-bold text-slate-500 transition-all group-hover:border-[#3346a3]/30 group-hover:bg-[#eef1ea] group-hover:text-[#3346a3] sm:h-10 sm:w-10 sm:text-base">
                       {student.initial}
                     </div>
                     <EditStudentDialog 
                       student={student} 
                       trigger={
                         <button 
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus:outline-none"
+                          aria-label={`${student.name}を編集`}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600 focus:outline-none sm:h-10 sm:w-10"
                         >
                           <MoreHorizontal className="h-5 w-5" />
                         </button>

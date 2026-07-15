@@ -20,7 +20,7 @@ export default async function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-4 border-b border-border bg-white/90 px-4 shadow-sm backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-2 border-b border-border bg-white/90 px-3 shadow-sm backdrop-blur sm:gap-4 sm:px-6">
       <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity" aria-label="Scholar Compass ホーム">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-white">
           <Compass className="h-5 w-5" />
@@ -68,7 +68,7 @@ export default async function Header() {
 
             {/* ナビゲーションリンクの有効化 (メンターのみ) */}
             {user?.role !== "STUDENT" && (
-              <div className="flex items-center gap-3 sm:gap-5 text-slate-500 sm:mr-4">
+              <div className="flex items-center gap-2 text-slate-500 sm:mr-4 sm:gap-5">
                 <NavLink href="/" exact title="ダッシュボード">
                   <LayoutGrid className="h-5 w-5" />
                 </NavLink>

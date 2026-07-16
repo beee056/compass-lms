@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 const DEFAULT_CSV_PATH = "data/notebooklm-practice-questions.csv";
-const EXPECTED_QUESTION_COUNT = 30;
+const EXPECTED_QUESTION_COUNT = 60;
+const EXPECTED_CATEGORY_COUNT = 20;
 const ALLOWED_CATEGORIES = new Set(["小論文", "志望理由書", "面接"]);
 
 function parseCsv(text) {
@@ -87,7 +88,7 @@ function normalizeQuestions(rows) {
       );
     }
 
-    const [externalId, category, title, prompt, modelAnswer, university, difficulty, reference, sourceNumber] =
+    const [externalId, category, title, prompt, modelAnswer, university, difficulty, reference, sourceName] =
       values;
 
     if (!/^NLM-\d{3}$/.test(externalId)) {
@@ -104,7 +105,7 @@ function normalizeQuestions(rows) {
       modelAnswer?.trim(),
       difficulty?.trim() ? `【難易度】${difficulty.trim()}` : null,
       reference?.trim() ? `【NotebookLM参照】${reference.trim()}` : null,
-      sourceNumber?.trim() ? `【ソース番号】${sourceNumber.trim()}` : null
+      sourceName?.trim() ? `【出典】${sourceName.trim()}` : null
     ].filter(Boolean);
 
     return {
@@ -124,9 +125,36 @@ const csvPath = resolve(process.argv[2] || DEFAULT_CSV_PATH);
 const csv = await readFile(csvPath, "utf8");
 const questions = normalizeQuestions(parseCsv(csv));
 const uniqueIds = new Set(questions.map((question) => question.id));
+const uniqueTitles = new Set(questions.map((question) => question.title));
+const expectedIds = new Set(
+  Array.from({ length: EXPECTED_QUESTION_COUNT }, (_, index) =>
+    questionId(`NLM-${String(index + 1).padStart(3, "0")}`)
+  )
+);
 
-if (uniqueIds.size !== questions.length) {
-  throw new Error("CSV内にQuestionIdの重複があります。");
+if (
+  uniqueIds.size !== questions.length ||
+  uniqueIds.size !== expectedIds.size ||
+  [...expectedIds].some((id) => !uniqueIds.has(id))
+) {
+  throw new Error("QuestionIdはNLM-001からNLM-060までの連番かつ一意である必要があります。");
+}
+
+if (uniqueTitles.size !== questions.length) {
+  throw new Error("CSV内にTitleの重複があります。");
+}
+
+const categoryCounts = questions.reduce((counts, question) => {
+  counts[question.category] = (counts[question.category] || 0) + 1;
+  return counts;
+}, {});
+
+if ([...ALLOWED_CATEGORIES].some((category) => categoryCounts[category] !== EXPECTED_CATEGORY_COUNT)) {
+  throw new Error(
+    `各カテゴリは${EXPECTED_CATEGORY_COUNT}件である必要があります。実際: ${Object.entries(categoryCounts)
+      .map(([category, count]) => `${category} ${count}件`)
+      .join(" / ")}`
+  );
 }
 
 const prisma = new PrismaClient();
@@ -148,11 +176,6 @@ try {
       })
     )
   ]);
-
-  const categoryCounts = questions.reduce((counts, question) => {
-    counts[question.category] = (counts[question.category] || 0) + 1;
-    return counts;
-  }, {});
 
   console.log(
     `NotebookLM問題を${questions.length}件同期しました: ${Object.entries(categoryCounts)

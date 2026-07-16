@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 const DEFAULT_CSV_PATH = "data/notebooklm-practice-questions.csv";
-const EXPECTED_QUESTION_COUNT = 60;
-const EXPECTED_CATEGORY_COUNT = 20;
+const EXPECTED_QUESTION_COUNT = 120;
+const EXPECTED_CATEGORY_COUNT = 40;
 const ALLOWED_CATEGORIES = new Set(["小論文", "志望理由書", "面接"]);
 
 function parseCsv(text) {
@@ -137,7 +137,9 @@ if (
   uniqueIds.size !== expectedIds.size ||
   [...expectedIds].some((id) => !uniqueIds.has(id))
 ) {
-  throw new Error("QuestionIdはNLM-001からNLM-060までの連番かつ一意である必要があります。");
+  throw new Error(
+    `QuestionIdはNLM-001からNLM-${String(EXPECTED_QUESTION_COUNT).padStart(3, "0")}までの連番かつ一意である必要があります。`
+  );
 }
 
 if (uniqueTitles.size !== questions.length) {

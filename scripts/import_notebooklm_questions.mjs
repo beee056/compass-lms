@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const DEFAULT_CSV_PATH = "data/notebooklm-practice-questions.csv";
-const EXPECTED_QUESTION_COUNT = 180;
-const EXPECTED_CATEGORY_COUNT = 60;
+const EXPECTED_QUESTION_COUNT = 300;
+const EXPECTED_CATEGORY_COUNT = 100;
 const ALLOWED_CATEGORIES = new Set(["小論文", "志望理由書", "面接"]);
 
 function parseCsv(text) {
@@ -176,23 +176,62 @@ if ([...ALLOWED_CATEGORIES].some((category) => categoryCounts[category] !== EXPE
 
 const prisma = new PrismaClient();
 
-try {
-  await prisma.$transaction([
-    prisma.questionBank.deleteMany({
+async function syncQuestions() {
+  await prisma.$transaction(async (tx) => {
+    const conflictingQuestions = await tx.questionBank.findMany({
+      where: {
+        id: { in: [...uniqueIds] },
+        OR: [{ source: { not: "NOTEBOOKLM" } }, { tenantId: { not: null } }]
+      },
+      select: { id: true, source: true, tenantId: true }
+    });
+
+    if (conflictingQuestions.length > 0) {
+      throw new Error(
+        `NotebookLM以外の問題とQuestionIdが衝突しています: ${conflictingQuestions
+          .map(({ id, source, tenantId }) => `${id} (${source}, tenantId=${tenantId})`)
+          .join(", ")}`
+      );
+    }
+
+    await tx.questionBank.deleteMany({
       where: {
         source: "NOTEBOOKLM",
         tenantId: null,
         id: { notIn: [...uniqueIds] }
       }
-    }),
-    ...questions.map((question) =>
-      prisma.questionBank.upsert({
+    });
+
+    for (const question of questions) {
+      await tx.questionBank.upsert({
         where: { id: question.id },
         update: question,
         create: question
-      })
-    )
-  ]);
+      });
+    }
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 120_000
+  });
+}
+
+try {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await syncQuestions();
+      break;
+    } catch (error) {
+      const isRetryableConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+
+      if (!isRetryableConflict || attempt === maxAttempts) {
+        throw error;
+      }
+    }
+  }
 
   console.log(
     `NotebookLM問題を${questions.length}件同期しました: ${Object.entries(categoryCounts)

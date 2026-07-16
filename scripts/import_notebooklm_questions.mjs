@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 const DEFAULT_CSV_PATH = "data/notebooklm-practice-questions.csv";
-const EXPECTED_QUESTION_COUNT = 120;
-const EXPECTED_CATEGORY_COUNT = 40;
+const EXPECTED_QUESTION_COUNT = 180;
+const EXPECTED_CATEGORY_COUNT = 60;
 const ALLOWED_CATEGORIES = new Set(["小論文", "志望理由書", "面接"]);
 
 function parseCsv(text) {
@@ -100,6 +100,16 @@ function normalizeQuestions(rows) {
     if (!title?.trim() || !prompt?.trim()) {
       throw new Error(`CSV ${rowNumber}行目: TitleまたはPromptが空です。`);
     }
+    if (
+      !modelAnswer?.trim() ||
+      !difficulty?.trim() ||
+      !reference?.trim() ||
+      !sourceName?.trim()
+    ) {
+      throw new Error(
+        `CSV ${rowNumber}行目: ModelAnswer、Difficulty、Reference、Sourceは必須です。`
+      );
+    }
 
     const answerNotes = [
       modelAnswer?.trim(),
@@ -126,6 +136,7 @@ const csv = await readFile(csvPath, "utf8");
 const questions = normalizeQuestions(parseCsv(csv));
 const uniqueIds = new Set(questions.map((question) => question.id));
 const uniqueTitles = new Set(questions.map((question) => question.title));
+const uniquePrompts = new Set(questions.map((question) => question.prompt));
 const expectedIds = new Set(
   Array.from({ length: EXPECTED_QUESTION_COUNT }, (_, index) =>
     questionId(`NLM-${String(index + 1).padStart(3, "0")}`)
@@ -144,6 +155,10 @@ if (
 
 if (uniqueTitles.size !== questions.length) {
   throw new Error("CSV内にTitleの重複があります。");
+}
+
+if (uniquePrompts.size !== questions.length) {
+  throw new Error("CSV内にPromptの重複があります。");
 }
 
 const categoryCounts = questions.reduce((counts, question) => {

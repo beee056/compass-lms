@@ -314,7 +314,7 @@ export default function PracticeSection({
                   required
                   className="border-slate-200 min-h-[240px]"
                 />
-                <div className="text-right text-xs text-slate-400">現在の文字数: {answer.length} 字</div>
+                <div className="text-right text-xs text-slate-400">現在の文字数: {Array.from(answer).length} 字</div>
               </div>
             </div>
 

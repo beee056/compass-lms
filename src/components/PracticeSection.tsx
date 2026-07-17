@@ -2,7 +2,7 @@
 import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
-import { PenTool, Plus, Loader2, Sparkles, AlertCircle, BookOpen, Wand2, CheckCircle2, MinusCircle } from "lucide-react";
+import { PenTool, Plus, Loader2, Sparkles, AlertCircle, BookOpen, Wand2, CheckCircle2, MinusCircle, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,7 @@ export default function PracticeSection({
 
   const rubric = RUBRICS[kind];
   const interviewMetrics = kind === "面接" ? getInterviewResponseMetrics(answer) : null;
+  const selectedQuestion = questionBank.find((q) => q.id === selectedQuestionId);
 
   const handleBankSelect = (questionId: string) => {
     setSelectedQuestionId(questionId);
@@ -204,7 +205,7 @@ export default function PracticeSection({
               </div>
 
               {inputMode === "bank" && (
-                <div className="grid gap-2">
+                <div className="grid gap-3">
                   <Label className="text-slate-700 font-semibold text-sm">演習問題を選択</Label>
                   <select
                     value={selectedQuestionId}
@@ -220,6 +221,51 @@ export default function PracticeSection({
                   </select>
                   {questionBank.length === 0 && (
                     <p className="text-xs text-slate-400">問題バンクが空です。「自分で設問を入力する」をご利用ください。</p>
+                  )}
+                  {selectedQuestion && (
+                    <details open className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
+                      <summary className="flex cursor-pointer list-none items-start justify-between gap-3 bg-slate-50 px-4 py-3">
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-sm bg-blue-100 px-2 py-0.5 text-[11px] font-black text-blue-700">
+                              {selectedQuestion.category}
+                            </span>
+                            {selectedQuestion.university && (
+                              <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                                {selectedQuestion.university}
+                              </span>
+                            )}
+                          </span>
+                          <span className="mt-1 block text-sm font-black text-slate-800">{selectedQuestion.title}</span>
+                        </span>
+                        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="space-y-3 p-4">
+                        <div>
+                          <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                            {kind === "面接" ? "主質問" : "設問"}
+                          </p>
+                          <p className="whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm font-medium leading-7 text-slate-700">
+                            {kind === "面接" ? getInterviewMainQuestion(selectedQuestion.prompt) : selectedQuestion.prompt}
+                          </p>
+                        </div>
+                        <details className="group/answer rounded-md border border-blue-100 bg-blue-50/40">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-black text-blue-900">
+                            回答例・採点ポイント
+                            <ChevronDown className="h-4 w-4 shrink-0 text-blue-400 transition-transform group-open/answer:rotate-180" />
+                          </summary>
+                          <div className="border-t border-blue-100 px-3 py-3">
+                            {selectedQuestion.modelAnswer ? (
+                              <p className="whitespace-pre-wrap text-sm font-medium leading-7 text-slate-700">
+                                {selectedQuestion.modelAnswer}
+                              </p>
+                            ) : (
+                              <p className="text-sm font-medium text-slate-500">回答例はまだ準備中です。</p>
+                            )}
+                          </div>
+                        </details>
+                      </div>
+                    </details>
                   )}
                 </div>
               )}
@@ -282,24 +328,25 @@ export default function PracticeSection({
                 </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="promptText" className="text-slate-700 font-semibold text-sm">
-                  {kind === "面接" ? "面接の主質問（1問）" : "設問（テーマ）"}
-                </Label>
-                <Textarea
-                  id="promptText"
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                  placeholder={
-                    kind === "面接"
-                      ? "例：本学を志望した理由を教えてください。"
-                      : "例：AI技術の進化が社会に与える影響について、あなたの考えを述べなさい。（800字）"
-                  }
-                  required
-                  readOnly={inputMode === "bank" && !!selectedQuestionId}
-                  className={`border-slate-200 min-h-[100px] ${inputMode === "bank" && selectedQuestionId ? "bg-slate-50" : ""}`}
-                />
-              </div>
+              {!(inputMode === "bank" && selectedQuestion) && (
+                <div className="grid gap-2">
+                  <Label htmlFor="promptText" className="text-slate-700 font-semibold text-sm">
+                    {kind === "面接" ? "面接の主質問（1問）" : "設問（テーマ）"}
+                  </Label>
+                  <Textarea
+                    id="promptText"
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                    placeholder={
+                      kind === "面接"
+                        ? "例：本学を志望した理由を教えてください。"
+                        : "例：AI技術の進化が社会に与える影響について、あなたの考えを述べなさい。（800字）"
+                    }
+                    required
+                    className="border-slate-200 min-h-[100px]"
+                  />
+                </div>
+              )}
 
               <div className="grid gap-2">
                 <Label htmlFor="answer" className="text-slate-700 font-semibold text-sm">

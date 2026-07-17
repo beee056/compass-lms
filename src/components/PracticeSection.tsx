@@ -419,6 +419,11 @@ export default function PracticeSection({
                       {isV2 && feedback.universityName && (
                         <span className="text-xs py-0.5 px-2 bg-slate-100 text-slate-600 font-bold rounded-sm">{feedback.universityName}</span>
                       )}
+                      {isV2 && feedback.universityProfile?.label && (
+                        <span className="text-xs py-0.5 px-2 bg-violet-100 text-violet-700 font-bold rounded-sm">
+                          {feedback.universityProfile.label}
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400 font-medium">
                         {new Date(record.createdAt).toLocaleDateString("ja-JP", {
                           year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo"

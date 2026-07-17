@@ -1,6 +1,13 @@
 interface StructuredPracticeFeedback {
   version: number;
   universityName?: string | null;
+  universityProfile?: {
+    id: string;
+    version: number;
+    label: string;
+    matchedBy: string;
+    taskTypes: string[];
+  } | null;
   overallFeedback?: string;
   axes: Array<{
     key: string;

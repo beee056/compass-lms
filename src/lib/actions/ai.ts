@@ -17,6 +17,10 @@ import {
   selectGradingReferences,
   type GradingReferenceCandidate
 } from "../grading-context";
+import {
+  buildUniversityGradingProfileContext,
+  resolveUniversityGradingProfile
+} from "../university-grading-profiles";
 
 // -----------------------------------------------------------------------------
 // AI添削（ルーブリック方式）
@@ -105,6 +109,12 @@ export async function evaluateWithRubric(
     if (effectiveUniversityName && effectiveUniversityName.length > 100) {
       throw new ValidationError("大学・学部名は100字以内で指定してください");
     }
+    const universityProfile = resolveUniversityGradingProfile({
+      kind,
+      universityName: effectiveUniversityName,
+      promptText: authoritativePromptText
+    });
+    const universityProfileContext = buildUniversityGradingProfileContext(universityProfile);
 
     // 同カテゴリの問題群から、選択問題と類似問題を採点参照として抽出する。
     // 選択問題は主参照、類似問題は設問要求を一般化するための補助参照として扱う。
@@ -168,6 +178,7 @@ ${axisText}
 
 【評価上の注意】
 ${notesText}
+${universityProfileContext ? `\n${universityProfileContext}` : ""}
 ${effectiveCharLimit ? `\n【規定字数と実測値】規定${effectiveCharLimit}字以内 / 解答${answerChars}字（システム計測値。この文字数を正として再計算しないこと）` : `\n【解答文字数】${answerChars}字（システム計測値。この文字数を正として再計算しないこと）`}
 ${gradingReferenceContext || effectiveUniversityName ? `
 【参照例の使用規則】
@@ -269,9 +280,25 @@ ${essayScoringRules ? `\n${essayScoringRules}` : ""}
       version: 3,
       kind,
       universityName: effectiveUniversityName || null,
+      universityProfile: universityProfile
+        ? {
+            id: universityProfile.id,
+            version: universityProfile.version,
+            label: universityProfile.label,
+            matchedBy: universityProfile.matchedBy,
+            taskTypes: universityProfile.taskTypes
+          }
+        : null,
       taskAnalysis: evaluation.taskAnalysis,
       grounding: {
         strategy: gradingReferences.length > 0 ? "question-bank-retrieval" : "rubric-only",
+        universityProfile: universityProfile
+          ? {
+              id: universityProfile.id,
+              version: universityProfile.version,
+              sourceReferences: universityProfile.sourceReferences
+            }
+          : null,
         references: gradingReferences.map((reference) => ({
           id: reference.id,
           title: reference.title,

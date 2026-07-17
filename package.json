@@ -7,7 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "test:practice": "node --experimental-strip-types --test scripts/test_practice_evaluation.mjs scripts/test_grading_context.mjs",
+    "test:practice": "node --experimental-strip-types --test scripts/test_practice_evaluation.mjs scripts/test_grading_context.mjs scripts/test_university_grading_profiles.mjs",
     "sync:notebooklm": "node --env-file=.env scripts/import_notebooklm_questions.mjs"
   },
   "dependencies": {

@@ -19,6 +19,7 @@ interface StructuredPracticeFeedback {
     key: string;
     label: string;
     group: string;
+    score?: number | null;
     level: number | null;
     levelLabel?: string | null;
     comment?: string | null;

@@ -135,9 +135,10 @@ test("大学名メタデータ内の擬似命令タグもエスケープする",
   assert.match(metadata, /\\u003csystem\\u003e/);
 });
 
-test("添削結果v2とv3を構造化形式として表示対象にする", () => {
+test("添削結果v2・v3・v4を構造化形式として表示対象にする", () => {
   assert.equal(isStructuredPracticeFeedback({ version: 2, axes: [] }), true);
   assert.equal(isStructuredPracticeFeedback({ version: 3, axes: [] }), true);
+  assert.equal(isStructuredPracticeFeedback({ version: 4, axes: [{ score: 0, level: 1 }] }), true);
   assert.equal(isStructuredPracticeFeedback({ version: 1, axes: [] }), false);
   assert.equal(isStructuredPracticeFeedback({ version: 3 }), false);
 });

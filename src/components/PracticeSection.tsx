@@ -24,8 +24,8 @@ const LEVEL_STYLE: Record<number, string> = {
 };
 
 function scoreColor(score: number): string {
-  if (score >= 80) return "text-emerald-600";
-  if (score >= 60) return "text-indigo-600";
+  if (score >= 85) return "text-emerald-600";
+  if (score >= 70) return "text-indigo-600";
   if (score >= 40) return "text-amber-600";
   return "text-red-600";
 }
@@ -263,7 +263,7 @@ export default function PracticeSection({
               <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
                 <h4 className="font-bold text-blue-900 text-sm flex items-center gap-2 mb-2">
                   <BookOpen className="h-4 w-4" />
-                  「{kind}」の評価軸（各レベル1〜4 / 総合 = 共通60% + 固有40%）
+                  「{kind}」の評価軸（各軸0〜100点 / 総合 = 共通平均60% + 固有平均40%）
                 </h4>
                 <div className="text-xs text-blue-800/80 space-y-1">
                   <p>
@@ -453,7 +453,9 @@ export default function PracticeSection({
                       {feedback.overallFeedback}
                     </p>
 
-                    <h4 className="font-bold text-slate-800 mb-3 border-b pb-2">ルーブリック評価（レベル1〜4）</h4>
+                    <h4 className="font-bold text-slate-800 mb-3 border-b pb-2">
+                      {feedback.version >= 4 ? "ルーブリック評価（各軸100点・レベル併記）" : "ルーブリック評価（レベル1〜4）"}
+                    </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                       {feedback.axes.map((axis: any) => (
                         <div key={axis.key} className={`border rounded-lg p-3.5 ${axis.level ? "border-slate-100 bg-white" : "border-dashed border-slate-200 bg-slate-50/50"}`}>
@@ -465,9 +467,14 @@ export default function PracticeSection({
                               </span>
                             </div>
                             {axis.level ? (
-                              <span className={`shrink-0 text-[11px] font-black px-2 py-0.5 rounded border ${LEVEL_STYLE[axis.level]}`}>
-                                Lv.{axis.level} {axis.levelLabel}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {typeof axis.score === "number" && (
+                                  <span className="shrink-0 text-xs font-black text-slate-800">{axis.score}点</span>
+                                )}
+                                <span className={`shrink-0 text-[11px] font-black px-2 py-0.5 rounded border ${LEVEL_STYLE[axis.level]}`}>
+                                  Lv.{axis.level} {axis.levelLabel}
+                                </span>
+                              </div>
                             ) : (
                               <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-400">
                                 対面評価

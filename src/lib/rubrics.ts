@@ -2,9 +2,9 @@
 // 出典: ルーブリック評価表【共通5軸】+ 各教材の固有軸、小論文評価観点シート、
 //       面接評価観点シート、志望理由書要点ガイド(43要点)
 //
-// 採点方式（原典準拠）:
-//   各軸をレベル1-4で判定 → 換算 4=1.0 / 3=0.75 / 2=0.5 / 1=0.25
-//   総合点(100点満点) = 共通5軸の平均換算 × 60 + 固有軸の平均換算 × 40
+// 採点方式:
+//   各軸を0-100点で判定し、レベル1-4は点数帯を説明する表示として併記する。
+//   総合点(100点満点) = 共通5軸の平均点 × 60% + 固有軸の平均点 × 40%
 //   ※テキスト演習で評価不能な軸(面接のノンバーバル等)は総合点の計算から除外し、
 //     固有軸がすべて評価不能な場合は共通軸100%で算出する。
 
@@ -194,13 +194,13 @@ const ESSAY_RUBRIC: Rubric = {
     },
     {
       key: "growth",
-      label: "成長志向・改善力",
-      focus: "反論取り込み・推敲",
+      label: "自己点検・精密化",
+      focus: "主張の範囲・留保・一貫性の自己点検",
       levels: {
-        "4": "予想される反論を自ら提示し、それに対する再反論を行うことで論を強化している。推敲の跡が明確。",
-        "3": "反論の視点は盛り込まれているが、それに対する応答が十分でない。",
-        "2": "一方的な主張に終始しており、異なる視点や反論への配慮がない。",
-        "1": "反論や批判を無視している。同じ種類の誤りが繰り返されている。"
+        "4": "事実と推論、主張できる範囲と限界を区別し、過度な一般化や内部矛盾を自ら避けて、表現を精密に制御している。",
+        "3": "主張の範囲や留保は概ね適切で、重大な矛盾はない。一部に断定の強さや説明範囲の調整不足がある。",
+        "2": "根拠から言える範囲を超えた一般化、曖昧な限定、または部分的な矛盾があり、自己点検が不足している。",
+        "1": "根拠と無関係な絶対視や重大な自己矛盾が繰り返され、主張の成立範囲を点検できていない。"
       },
       aiEvaluable: true
     }
@@ -376,30 +376,47 @@ export const RUBRICS: Record<PracticeKind, Rubric> = {
   "面接": INTERVIEW_RUBRIC
 };
 
-// レベル→換算係数（原典: 4=1.0, 3=0.75, 2=0.5, 1=0.25）
-export function levelToRatio(level: number): number {
-  return Math.min(4, Math.max(1, Math.round(level))) / 4;
+export function clampAxisScore(score: number): number {
+  const boundedScore = Math.min(100, Math.max(0, score));
+  const roundedScore = Math.round(boundedScore / 5) * 5;
+  if (boundedScore >= 85) return Math.min(100, Math.max(85, roundedScore));
+  if (boundedScore >= 70) return Math.min(80, Math.max(70, roundedScore));
+  if (boundedScore >= 40) return Math.min(65, Math.max(40, roundedScore));
+  return Math.min(35, roundedScore);
 }
 
-// 総合点(100点満点) = 共通軸平均×60 + 評価可能な固有軸平均×40
+export function scoreToLevel(score: number): number {
+  const normalizedScore = Math.min(100, Math.max(0, score));
+  if (normalizedScore >= 85) return 4;
+  if (normalizedScore >= 70) return 3;
+  if (normalizedScore >= 40) return 2;
+  return 1;
+}
+
+// 総合点(100点満点) = 共通軸平均点×60% + 評価可能な固有軸平均点×40%
 // 固有軸がすべて評価不能な場合は共通軸100%で算出
 export function computeTotalScore(
   rubric: Rubric,
-  levels: Record<string, number>
+  scores: Record<string, number>
 ): number {
-  const commonRatios = rubric.commonAxes
-    .filter((a) => a.aiEvaluable && levels[a.key] != null)
-    .map((a) => levelToRatio(levels[a.key]));
-  const specificRatios = rubric.specificAxes
-    .filter((a) => a.aiEvaluable && levels[a.key] != null)
-    .map((a) => levelToRatio(levels[a.key]));
+  const commonAxes = rubric.commonAxes.filter((axis) => axis.aiEvaluable);
+  const specificAxes = rubric.specificAxes.filter((axis) => axis.aiEvaluable);
+  const missingAxes = [...commonAxes, ...specificAxes].filter(
+    (axis) => typeof scores[axis.key] !== "number" || !Number.isFinite(scores[axis.key])
+  );
+  if (missingAxes.length > 0) {
+    throw new Error(`採点結果に必須評価軸がありません: ${missingAxes.map((axis) => axis.key).join(", ")}`);
+  }
+
+  const commonScores = commonAxes.map((axis) => clampAxisScore(scores[axis.key]));
+  const specificScores = specificAxes.map((axis) => clampAxisScore(scores[axis.key]));
 
   const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
 
-  if (specificRatios.length === 0) {
-    return Math.round(avg(commonRatios) * 100);
+  if (specificScores.length === 0) {
+    return Math.round(avg(commonScores));
   }
-  return Math.round(avg(commonRatios) * 60 + avg(specificRatios) * 40);
+  return Math.round(avg(commonScores) * 0.6 + avg(specificScores) * 0.4);
 }
 
 export const LEVEL_LABEL: Record<number, string> = {

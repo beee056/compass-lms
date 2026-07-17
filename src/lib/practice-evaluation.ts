@@ -14,11 +14,12 @@ export function inferCharLimit(promptText: string): number | undefined {
   return uniqueCandidates.length === 1 ? uniqueCandidates[0] : undefined;
 }
 
-export function getLengthLevelCap(answerChars: number, charLimit?: number): number | null {
+export function getLengthScoreCap(answerChars: number, charLimit?: number): number | null {
   if (!charLimit) return null;
-  const ratio = answerChars / charLimit;
-  if (ratio < 0.5) return 1;
-  if (ratio < 0.8) return 2;
-  if (ratio < 0.9) return 3;
-  return 4;
+  const ratio = Math.max(0, answerChars / charLimit);
+
+  if (ratio < 0.5) return Math.min(35, Math.round(((ratio / 0.5) * 35) / 5) * 5);
+  if (ratio < 0.8) return 40 + Math.round((((ratio - 0.5) / 0.3) * 25) / 5) * 5;
+  if (ratio < 0.9) return 70 + Math.round((((ratio - 0.8) / 0.1) * 10) / 5) * 5;
+  return 85 + Math.round((((Math.min(ratio, 1) - 0.9) / 0.1) * 15) / 5) * 5;
 }

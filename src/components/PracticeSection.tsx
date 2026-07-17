@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
+import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
 
@@ -408,7 +409,7 @@ export default function PracticeSection({
         ) : (
           records.map((record) => {
             const feedback = parseFeedback(record.feedback);
-            const isV2 = feedback?.version === 2;
+            const isV2 = isStructuredPracticeFeedback(feedback);
             return (
               <Card key={record.id} className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">

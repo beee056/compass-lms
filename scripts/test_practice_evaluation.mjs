@@ -4,13 +4,14 @@ import {
   countCharacters,
   containsInterviewCharacterLimit,
   estimateInterviewResponseSeconds,
-  getInterviewApplicableAxisKeys,
   getInterviewMainQuestion,
   getInterviewResponseMetrics,
   hasMultipleInterviewQuestions,
   getLengthScoreCap,
   inferCharLimit,
-  resolveEffectiveCharLimit
+  inferCharLimitSpec,
+  resolveEffectiveCharLimit,
+  resolveEffectiveCharLimitSpec
 } from "../src/lib/practice-evaluation.ts";
 
 test("countCharacters counts Unicode code points", () => {
@@ -27,8 +28,24 @@ test("getLengthScoreCap preserves level bands with continuous scores", () => {
   assert.equal(getLengthScoreCap(719, 800), 80);
   assert.equal(getLengthScoreCap(720, 800), 85);
   assert.equal(getLengthScoreCap(800, 800), 100);
-  assert.equal(getLengthScoreCap(900, 800), 100);
   assert.equal(getLengthScoreCap(800, undefined), null);
+});
+
+test("getLengthScoreCap penalizes exceeding an upper-bound (以内) limit", () => {
+  // 「以内」指定: 超過1割以内は要改善上限、それ以上は未達上限
+  assert.equal(getLengthScoreCap(801, 800, "max"), 65);
+  assert.equal(getLengthScoreCap(880, 800, "max"), 65);
+  assert.equal(getLengthScoreCap(881, 800, "max"), 35);
+  assert.equal(getLengthScoreCap(900, 800, "max"), 35);
+  assert.equal(getLengthScoreCap(1600, 800, "max"), 35);
+});
+
+test("getLengthScoreCap tolerates small overruns for approximate (程度・前後) limits", () => {
+  assert.equal(getLengthScoreCap(800, 800, "approx"), 100);
+  assert.equal(getLengthScoreCap(880, 800, "approx"), 100);
+  assert.equal(getLengthScoreCap(900, 800, "approx"), 65);
+  assert.equal(getLengthScoreCap(960, 800, "approx"), 65);
+  assert.equal(getLengthScoreCap(961, 800, "approx"), 35);
 });
 
 test("inferCharLimit supports common Japanese formats", () => {
@@ -36,6 +53,16 @@ test("inferCharLimit supports common Japanese formats", () => {
   assert.equal(inferCharLimit("（８００字）"), 800);
   assert.equal(inferCharLimit("1,000字程度"), 1000);
   assert.equal(inferCharLimit("１，２００字前後"), 1200);
+});
+
+test("inferCharLimitSpec distinguishes upper-bound and approximate limits", () => {
+  assert.deepEqual(inferCharLimitSpec("800字以内で述べなさい"), { limit: 800, type: "max" });
+  assert.deepEqual(inferCharLimitSpec("800字程度で述べなさい"), { limit: 800, type: "approx" });
+  assert.deepEqual(inferCharLimitSpec("１，２００字前後でまとめなさい"), { limit: 1200, type: "approx" });
+  // 接尾辞なしは上限扱い
+  assert.deepEqual(inferCharLimitSpec("（８００字）"), { limit: 800, type: "max" });
+  // 「以内」と「程度」が混在する場合は厳しい方（以内）を採用
+  assert.deepEqual(inferCharLimitSpec("800字程度、ただし800字以内とする"), { limit: 800, type: "max" });
 });
 
 test("inferCharLimit accepts repeated identical limits and rejects ambiguity", () => {
@@ -48,6 +75,21 @@ test("interview ignores explicit and embedded character limits", () => {
   assert.equal(resolveEffectiveCharLimit("面接", "800字以内で答えてください", 800), undefined);
   assert.equal(resolveEffectiveCharLimit("小論文", "800字以内で論じなさい"), 800);
   assert.equal(resolveEffectiveCharLimit("志望理由書", "自由記述", 600), 600);
+});
+
+test("explicit char limits inherit the prompt's limit type only when the values agree", () => {
+  assert.deepEqual(
+    resolveEffectiveCharLimitSpec("小論文", "800字程度で論じなさい", 800),
+    { limit: 800, type: "approx" }
+  );
+  assert.deepEqual(
+    resolveEffectiveCharLimitSpec("小論文", "800字程度で論じなさい", 600),
+    { limit: 600, type: "max" }
+  );
+  assert.deepEqual(
+    resolveEffectiveCharLimitSpec("小論文", "字数指定なし", 600),
+    { limit: 600, type: "max" }
+  );
 });
 
 test("interview response length is expressed as estimated speaking time", () => {
@@ -105,25 +147,39 @@ test("interview grading uses only the first main question", () => {
   assert.equal(hasMultipleInterviewQuestions("Q: 志望理由を教えてください。\n深掘り：\nQ: なぜ本学ですか。"), false);
 });
 
-test("interview evaluates personal and growth axes only when the main question asks for them", () => {
-  assert.deepEqual(
-    getInterviewApplicableAxisKeys("社会が変化しても守るべきものは何ですか。"),
-    ["logicStructure", "concreteness", "expression", "dialogue"]
+test("interview extraction handles the question-bank follow-up formats", () => {
+  // 【基本質問】…【深掘り質問】… （NLM-001形式）
+  assert.equal(
+    getInterviewMainQuestion(
+      "【基本質問】アドミッション・ポリシーの中で、あなたが最も共感する項目はどれですか？【深掘り質問】その項目を体現しているあなたの具体的な行動は？ 大学生活でそれをどう深めていきたいですか？"
+    ),
+    "アドミッション・ポリシーの中で、あなたが最も共感する項目はどれですか？"
   );
-  assert.deepEqual(
-    getInterviewApplicableAxisKeys("あなたは社会の変化についてどう考えますか。"),
-    ["logicStructure", "concreteness", "expression", "dialogue"]
+  // 基本質問：「…」 深掘り質問：「…」 （NLM-006形式）
+  assert.equal(
+    getInterviewMainQuestion(
+      "基本質問：「（専門分野の倫理的問題について）あなたはどう考えますか？（例：出生前診断、AIの倫理等）」 深掘り質問：「事実と意見を分けて説明してください。」"
+    ),
+    "「（専門分野の倫理的問題について）あなたはどう考えますか？（例：出生前診断、AIの倫理等）」"
   );
-  assert.deepEqual(
-    getInterviewApplicableAxisKeys("あなたが将来のAI社会をどう考えますか。"),
-    ["logicStructure", "concreteness", "expression", "dialogue"]
+  // 「…。深掘り質問：…」 全体が鉤括弧で囲まれ、深掘りが文中に続く形式（NLM-013形式）
+  assert.equal(
+    getInterviewMainQuestion(
+      "「あなたが志望する分野において、最も重要だと思う『倫理』は何ですか。深掘り質問：もし倫理と利益が相反したらどうしますか？」"
+    ),
+    "あなたが志望する分野において、最も重要だと思う『倫理』は何ですか。"
   );
-  assert.deepEqual(
-    getInterviewApplicableAxisKeys("大学で何を学びたいですか。"),
-    ["logicStructure", "concreteness", "expression", "dialogue"]
+  // 深掘りを除去した主質問が1問なら、複数質問として拒否しない
+  assert.equal(
+    hasMultipleInterviewQuestions(
+      "【基本質問】最も共感する項目はどれですか？【深掘り質問】その理由は？ どう深めますか？"
+    ),
+    false
   );
-  assert.deepEqual(
-    getInterviewApplicableAxisKeys("あなたが失敗から学び、次に活かした経験を教えてください。"),
-    ["logicStructure", "concreteness", "expression", "dialogue", "selfUnderstanding", "growth"]
+  assert.equal(
+    hasMultipleInterviewQuestions(
+      "基本質問：「あなたはどう考えますか？」 深掘り質問：「事実と意見を分けてください。理由も教えてください。」"
+    ),
+    false
   );
 });

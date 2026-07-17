@@ -4,9 +4,12 @@
 //
 // 採点方式:
 //   各軸を0-100点で判定し、レベル1-4は点数帯を説明する表示として併記する。
-//   総合点(100点満点) = 共通5軸の平均点 × 60% + 固有軸の平均点 × 40%
-//   ※テキスト演習で評価不能な軸(面接のノンバーバル等)は総合点の計算から除外し、
-//     固有軸がすべて評価不能な場合は共通軸100%で算出する。
+//   総合点(100点満点):
+//     - 志望理由書・小論文 = 共通5軸の平均点 × 60% + 固有軸の平均点 × 40%
+//     - 面接 = 評価対象になった全軸の単純平均（固有軸が実質「質問応答性」1軸のため、
+//       重み付けすると単一軸が総合の40%を支配してしまうのを避ける）
+//   ※テキスト演習で評価不能な軸(面接のノンバーバル等)と、設問が求めていないため
+//     適用外と判定された軸(questionDependent)は総合点の計算から除外する。
 
 export type PracticeKind = "志望理由書" | "小論文" | "面接";
 
@@ -16,12 +19,17 @@ export interface RubricAxis {
   focus: string; // 観点の補足
   levels: Record<"4" | "3" | "2" | "1", string>;
   aiEvaluable: boolean; // テキスト解答から評価可能か
+  // 設問内容によって評価対象になるかが変わる軸。guidanceはAIが適用可否を判定する基準。
+  questionDependent?: { guidance: string };
 }
+
+export type TotalScoreStrategy = "commonSpecificWeighted" | "evaluatedAxesAverage";
 
 export interface Rubric {
   kind: PracticeKind;
   commonAxes: RubricAxis[];
   specificAxes: RubricAxis[];
+  totalScoreStrategy: TotalScoreStrategy;
   // 添削プロンプトに追加で渡す評価上の注意（減点基準・チェックリスト等）
   gradingNotes: string[];
   // 志望理由書のみ: カバレッジを判定する大項目
@@ -33,6 +41,7 @@ export interface Rubric {
 // ---------------------------------------------------------------------------
 const SHIBO_RUBRIC: Rubric = {
   kind: "志望理由書",
+  totalScoreStrategy: "commonSpecificWeighted",
   commonAxes: [
     {
       key: "selfUnderstanding",
@@ -143,6 +152,7 @@ const SHIBO_RUBRIC: Rubric = {
 // ---------------------------------------------------------------------------
 const ESSAY_RUBRIC: Rubric = {
   kind: "小論文",
+  totalScoreStrategy: "commonSpecificWeighted",
   commonAxes: [
     {
       key: "selfUnderstanding",
@@ -228,17 +238,21 @@ const ESSAY_RUBRIC: Rubric = {
         "2": "反論の提示はあるが、それに対する回答が未解決である。",
         "1": "反論を全く考慮せず、一方的な主張に終始している。"
       },
-      aiEvaluable: true
+      aiEvaluable: true,
+      questionDependent: {
+        guidance:
+          "設問が是非・賛否・立場表明・意見論述・提案の正当化を求める場合に適用する。要約・説明・資料の読み取りだけを求める設問では適用外とする。"
+      }
     },
     {
       key: "completeness",
       label: "字数・完成度",
       focus: "規定字数の充足と論の完結",
       levels: {
-        "4": "規定字数の9割以上を使って論を十分に展開し、結論まで完成している。",
-        "3": "規定字数の8割以上を満たして結論まで完成している。内容の不足は軽微である。",
-        "2": "規定字数の5割以上8割未満、または結論や重要な論証の一部が不足している。",
-        "1": "規定字数の5割未満、または答案が明らかに未完成である。"
+        "4": "規定字数の9割以上を使い、上限を超過せずに論を十分に展開し、結論まで完成している。",
+        "3": "規定字数の8割以上を満たし、上限を超過せずに結論まで完成している。内容の不足は軽微である。",
+        "2": "規定字数の5割以上8割未満、上限の軽微な超過（1割以内）、または結論や重要な論証の一部が不足している。",
+        "1": "規定字数の5割未満、上限の大幅な超過、または答案が明らかに未完成である。"
       },
       aiEvaluable: true
     }
@@ -251,7 +265,7 @@ const ESSAY_RUBRIC: Rubric = {
     "【大幅減点】全体を通して一貫した意見・主張が展開できていない。一般論か自分の意見か不明瞭。論として妥当性を欠く暴論。",
     "【大幅減点】序論・本論・結論が明確に段落分けされていない。各段落の役割が不明瞭。",
     "【大幅減点】意見・主張に対する根拠（客観的事実・統計データ・想定反論など）が示されていない。",
-    "【大幅減点】規定字数の5割程度など大幅な字数不足。主語・述語が不明確な文が多い。一文が長すぎて読みにくい。",
+    "【大幅減点】規定字数の5割程度など大幅な字数不足、または「以内」指定の上限を大きく超える字数超過。主語・述語が不明確な文が多い。一文が長すぎて読みにくい。",
     "【小幅減点】「だ・である」と「です・ます」の混在。話し言葉・略字・漢字間違い・誤字脱字・ら抜き言葉。",
     "【小幅減点】段落冒頭の一マス空けなど基本ルール違反。指定外のタイトル・氏名の記入。",
     "【減点】受験学部の学問に関する基礎教養の欠如が読み取れる場合。"
@@ -263,6 +277,7 @@ const ESSAY_RUBRIC: Rubric = {
 // ---------------------------------------------------------------------------
 const INTERVIEW_RUBRIC: Rubric = {
   kind: "面接",
+  totalScoreStrategy: "evaluatedAxesAverage",
   commonAxes: [
     {
       key: "selfUnderstanding",
@@ -274,7 +289,11 @@ const INTERVIEW_RUBRIC: Rubric = {
         "2": "自分の強みは語れるが、それが志望する学業でどう活きるかの接続が弱い。用意した原稿を読み上げている印象が強い。",
         "1": "自己分析が不足しており、回答が表面的。一般論や抽象的な意気込みに終始している。"
       },
-      aiEvaluable: true
+      aiEvaluable: true,
+      questionDependent: {
+        guidance:
+          "主質問が志望動機・自己PR・生徒自身の経験・強み弱み・価値観・活動・将来像など、生徒本人に関する内容を尋ねる場合に適用する。時事問題・一般知識・仮定の状況判断だけを尋ね、本人のことに触れない質問では適用外とする。"
+      }
     },
     {
       key: "logicStructure",
@@ -322,7 +341,11 @@ const INTERVIEW_RUBRIC: Rubric = {
         "2": "その場しのぎの回答で、根本的な課題への向き合いが見えない。",
         "1": "改善の跡が見られず、同じ失敗の繰り返しがうかがえる。"
       },
-      aiEvaluable: true
+      aiEvaluable: true,
+      questionDependent: {
+        guidance:
+          "主質問が失敗・挫折・学び・改善・成長の振り返りを尋ねる場合、または経験からの学びの言及を明示的に求める場合に適用する。振り返りを求めていない質問で、学びの記述がないことを理由に減点してはならない。"
+      }
     }
   ],
   specificAxes: [
@@ -366,6 +389,7 @@ const INTERVIEW_RUBRIC: Rubric = {
   gradingNotes: [
     "面接評価観点シートの参考観点: 一般教養（時事への知識と自分の考え）/ 学業への関心 / 会話能力（的確・論理的）/ 表現力 / 傾聴力 / 主体性 / 協調性 / 問題解決への意欲 / 問題発見力 / 問題解決力（実現可能な解決策）/ 創造力 / ストレス耐性 / 目標達成への姿勢 / マナー。",
     "志望大学・学部が指定されている場合は、その大学特有の求める人材像との一致度も講評に含める。",
+    "同じ欠陥を複数軸で重複減点しない。質問意図とのズレは「質問応答性」で評価し、「論理・構造性」では話の組み立て（結論ファースト・構造化）だけを評価する。",
     "テキスト演習のため、ノンバーバル・緊張制御は評価対象外（対面練習でメンターが評価する）。"
   ]
 };
@@ -393,8 +417,10 @@ export function scoreToLevel(score: number): number {
   return 1;
 }
 
-// 総合点(100点満点) = 共通軸平均点×60% + 評価可能な固有軸平均点×40%
-// 固有軸がすべて評価不能な場合は共通軸100%で算出
+// 総合点(100点満点):
+//   commonSpecificWeighted = 共通軸平均点×60% + 評価可能な固有軸平均点×40%
+//     （固有軸がすべて評価不能な場合は共通軸100%で算出）
+//   evaluatedAxesAverage   = 評価対象になった全軸の単純平均（面接用。固有軸が実質1軸のため）
 export function computeTotalScore(
   rubric: Rubric,
   scores: Record<string, number>
@@ -413,10 +439,19 @@ export function computeTotalScore(
 
   const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
 
+  if (rubric.totalScoreStrategy === "evaluatedAxesAverage") {
+    return Math.round(avg([...commonScores, ...specificScores]));
+  }
   if (specificScores.length === 0) {
     return Math.round(avg(commonScores));
   }
   return Math.round(avg(commonScores) * 0.6 + avg(specificScores) * 0.4);
+}
+
+export function describeTotalScoreFormula(kind: PracticeKind): string {
+  return RUBRICS[kind].totalScoreStrategy === "evaluatedAxesAverage"
+    ? "総合 = 評価対象軸の単純平均"
+    : "総合 = 共通平均60% + 固有平均40%";
 }
 
 export const LEVEL_LABEL: Record<number, string> = {

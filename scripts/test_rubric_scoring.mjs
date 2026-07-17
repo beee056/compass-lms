@@ -61,7 +61,7 @@ test("essay total uses common-average 60 percent and specific-average 40 percent
   assert.equal(computeTotalScore(RUBRICS["小論文"], scores), 60);
 });
 
-test("interview excludes non-text axes and weights dialogue at 40 percent", () => {
+test("interview excludes non-text axes and averages all evaluated axes equally", () => {
   const scores = {
     selfUnderstanding: 50,
     logicStructure: 50,
@@ -73,5 +73,55 @@ test("interview excludes non-text axes and weights dialogue at 40 percent", () =
     dialogue: 0
   };
 
-  assert.equal(computeTotalScore(RUBRICS["面接"], scores), 30);
+  // (50×5 + 0) / 6 = 41.67 → 42。dialogue単独が総合の40%を支配しない。
+  assert.equal(computeTotalScore(RUBRICS["面接"], scores), 42);
+});
+
+test("interview averages only the applicable axes when question-dependent axes are excluded", () => {
+  const interview = RUBRICS["面接"];
+  const filtered = {
+    ...interview,
+    commonAxes: interview.commonAxes.filter((axis) => !["selfUnderstanding", "growth"].includes(axis.key))
+  };
+  const scores = {
+    logicStructure: 50,
+    concreteness: 50,
+    expression: 50,
+    dialogue: 0
+  };
+
+  // (50×3 + 0) / 4 = 37.5 → 38
+  assert.equal(computeTotalScore(filtered, scores), 38);
+});
+
+test("essay total excludes an inapplicable counter-argument axis from the specific average", () => {
+  const essay = RUBRICS["小論文"];
+  const filtered = {
+    ...essay,
+    specificAxes: essay.specificAxes.filter((axis) => axis.key !== "counterArgument")
+  };
+  const scores = {
+    selfUnderstanding: 80,
+    logicStructure: 70,
+    concreteness: 60,
+    expression: 50,
+    growth: 40,
+    taskResponse: 90,
+    completeness: 30
+  };
+
+  // 共通平均60×0.6 + 固有平均(90+30)/2=60×0.4 = 60
+  assert.equal(computeTotalScore(filtered, scores), 60);
+});
+
+test("question-dependent axes are declared for interview self axes and essay counter-argument", () => {
+  const interviewDependent = RUBRICS["面接"].commonAxes
+    .filter((axis) => axis.questionDependent)
+    .map((axis) => axis.key);
+  const essayDependent = [...RUBRICS["小論文"].commonAxes, ...RUBRICS["小論文"].specificAxes]
+    .filter((axis) => axis.questionDependent)
+    .map((axis) => axis.key);
+
+  assert.deepEqual(interviewDependent, ["selfUnderstanding", "growth"]);
+  assert.deepEqual(essayDependent, ["counterArgument"]);
 });

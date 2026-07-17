@@ -2,16 +2,50 @@ export function countCharacters(text: string): number {
   return Array.from(text).length;
 }
 
-export function inferCharLimit(promptText: string): number | undefined {
+// 「以内」= 上限指定（超過は違反）、「程度・前後」= 目安指定（1割程度の超過は許容）
+export type CharLimitType = "max" | "approx";
+
+export interface CharLimitSpec {
+  limit: number;
+  type: CharLimitType;
+}
+
+export function inferCharLimitSpec(promptText: string): CharLimitSpec | undefined {
   const normalized = promptText
     .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
     .replaceAll("，", ",");
-  const candidates = [...normalized.matchAll(/(\d{1,3}(?:,\d{3})+|\d{2,5})\s*字(?:以内|程度|前後)?/g)]
-    .map((match) => Number.parseInt(match[1].replaceAll(",", ""), 10))
-    .filter((value) => value >= 50 && value <= 10_000);
-  const uniqueCandidates = [...new Set(candidates)];
+  const candidates = [...normalized.matchAll(/(\d{1,3}(?:,\d{3})+|\d{2,5})\s*字(以内|程度|前後)?/g)]
+    .map((match) => ({
+      value: Number.parseInt(match[1].replaceAll(",", ""), 10),
+      suffix: match[2] as string | undefined
+    }))
+    .filter((candidate) => candidate.value >= 50 && candidate.value <= 10_000);
+  const uniqueValues = [...new Set(candidates.map((candidate) => candidate.value))];
+  if (uniqueValues.length !== 1) return undefined;
 
-  return uniqueCandidates.length === 1 ? uniqueCandidates[0] : undefined;
+  const hasApprox = candidates.some((candidate) => candidate.suffix === "程度" || candidate.suffix === "前後");
+  const hasMax = candidates.some((candidate) => candidate.suffix === "以内");
+  return { limit: uniqueValues[0], type: hasApprox && !hasMax ? "approx" : "max" };
+}
+
+export function inferCharLimit(promptText: string): number | undefined {
+  return inferCharLimitSpec(promptText)?.limit;
+}
+
+export function resolveEffectiveCharLimitSpec(
+  kind: string,
+  promptText: string,
+  explicitCharLimit?: number
+): CharLimitSpec | undefined {
+  if (kind === "面接") return undefined;
+  if (explicitCharLimit) {
+    const inferred = inferCharLimitSpec(promptText);
+    return {
+      limit: explicitCharLimit,
+      type: inferred?.limit === explicitCharLimit ? inferred.type : "max"
+    };
+  }
+  return inferCharLimitSpec(promptText);
 }
 
 export function resolveEffectiveCharLimit(
@@ -19,8 +53,7 @@ export function resolveEffectiveCharLimit(
   promptText: string,
   explicitCharLimit?: number
 ): number | undefined {
-  if (kind === "面接") return undefined;
-  return explicitCharLimit ?? inferCharLimit(promptText);
+  return resolveEffectiveCharLimitSpec(kind, promptText, explicitCharLimit)?.limit;
 }
 
 export function estimateInterviewResponseSeconds(answerChars: number): number {
@@ -78,17 +111,36 @@ export function containsInterviewCharacterLimit(promptText: string): boolean {
   );
 }
 
+// 問題バンクの実データに存在する深掘り表記のゆれをすべて検出する:
+//   「（深掘り：…）」「深掘り：」「【深掘り質問】」「 深掘り質問：」「追加質問：」等
+const FOLLOW_UP_MARKER = /[（(【]?\s*(?:深掘り(?:質問)?|追加質問)\s*(?:】|[:：])/;
+
+// 深掘り部分の切り落としで括弧の対応が崩れた場合の掃除
+function cleanDanglingBrackets(text: string): string {
+  let cleaned = text.trim();
+  const openCount = (cleaned.match(/「/g) ?? []).length;
+  const closeCount = (cleaned.match(/」/g) ?? []).length;
+  if (cleaned.startsWith("「") && openCount > closeCount) cleaned = cleaned.slice(1).trim();
+  if (cleaned.endsWith("「")) cleaned = cleaned.slice(0, -1).trim();
+  return cleaned;
+}
+
 function getInterviewMainQuestionBlock(promptText: string): string {
   const normalized = promptText.trim();
-  const followUpStart = normalized.search(/[（(]\s*(?:深掘り|追加質問)\s*[:：]/);
+  const followUpStart = normalized.search(FOLLOW_UP_MARKER);
   const withoutBundledFollowUp = followUpStart >= 0 ? normalized.slice(0, followUpStart).trim() : normalized;
   const mainLines: string[] = [];
   for (const line of withoutBundledFollowUp.split(/\r?\n/)) {
-    const trimmedLine = line.trim();
-    if (/^(?:深掘り|追加質問)\s*[:：]/.test(trimmedLine)) break;
+    const trimmedLine = line
+      .trim()
+      .replace(/^【?基本質問】?\s*[:：]?\s*/, "")
+      .trim();
+    if (/^(?:深掘り(?:質問)?|追加質問)\s*[:：]/.test(trimmedLine)) break;
     if (trimmedLine) mainLines.push(trimmedLine);
   }
-  return (mainLines.length > 0 ? mainLines : [withoutBundledFollowUp]).join("\n").trim();
+  return cleanDanglingBrackets(
+    (mainLines.length > 0 ? mainLines : [withoutBundledFollowUp]).join("\n").trim()
+  );
 }
 
 export function getInterviewMainQuestion(promptText: string): string {
@@ -99,40 +151,55 @@ export function getInterviewMainQuestion(promptText: string): string {
     .trim();
 }
 
+// 直前の質問への補足・言い換え・理由の追加要求（「また、その理由も教えてください」等）。
+// 面接では1つの主質問に自然に付随する表現であり、独立した追加質問として数えない。
+const CONTINUATION_MARKER =
+  /^(?:また|その|それ|そこで|さらに|あわせて|併せて|加えて|もし|どの|どんな)|そのように|その際|その時/;
+const ELABORATION_REQUEST =
+  /(?:理由|考え方|根拠|きっかけ|背景|経緯)(?:も|は|を|とともに|と共に|を含め|も含め).{0,12}(?:何|教え|述べ|説明|答え)|具体(?:的|例)?.{0,12}(?:交え|挙げ|踏まえ)|(?:結びつけ|結び付け|関連づけ|関連付け|踏まえ|交え)て?.{0,8}(?:説明|教え|述べ|答え)/;
+
 export function hasMultipleInterviewQuestions(promptText: string): boolean {
   const mainQuestionBlock = getInterviewMainQuestionBlock(promptText);
-  const questionMarkCount = (mainQuestionBlock.match(/[?？]/g) ?? []).length;
   const labeledQuestionCount = (mainQuestionBlock.match(/^\s*Q\s*[:：]/gim) ?? []).length;
-  const requestEndingCount = (
-    mainQuestionBlock.match(/(?:教えてください|述べてください|説明してください|答えてください|話してください|ですか|ますか|述べよ|説明せよ)/g) ?? []
-  ).length;
-  return questionMarkCount > 1 || labeledQuestionCount > 1 || requestEndingCount > 1;
+  if (labeledQuestionCount > 1) return true;
+
+  const sentences = mainQuestionBlock
+    .replace(/([。？！?!])/g, "$1\n")
+    .split(/\r?\n/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  let independentQuestionCount = 0;
+  for (const sentence of sentences) {
+    const isQuestionSentence =
+      /[?？]\s*[」）)]*$/.test(sentence) ||
+      /(?:教えてください|述べてください|説明してください|答えてください|話してください|述べよ|説明せよ|ですか|ますか)\s*[。」）)]*$/.test(sentence);
+    if (!isQuestionSentence) continue;
+    const isContinuation =
+      independentQuestionCount > 0 &&
+      (CONTINUATION_MARKER.test(sentence) || ELABORATION_REQUEST.test(sentence));
+    if (!isContinuation) independentQuestionCount += 1;
+  }
+  return independentQuestionCount > 1;
 }
 
-const INTERVIEW_ALWAYS_EVALUATED_AXES = ["logicStructure", "concreteness", "expression", "dialogue"];
-
-export function getInterviewApplicableAxisKeys(promptText: string): string[] {
-  const mainQuestion = getInterviewMainQuestion(promptText);
-  const applicableAxes = [...INTERVIEW_ALWAYS_EVALUATED_AXES];
-  if (
-    /(?:あなた|自身|自分).{0,12}(?:経験|志望|強み|弱み|価値観|活動|取り組み|将来(?:像|の目標|したいこと|やりたいこと))|(?:経験|志望理由|強み|弱み|価値観|活動|取り組み|将来像|将来の目標)(?:を|について).{0,12}(?:教え|話し|述べ)/.test(mainQuestion)
-  ) {
-    applicableAxes.push("selfUnderstanding");
-  }
-  if (
-    /(?:失敗|経験|活動|取り組み).{0,15}(?:学び|学ん|成長|改善|振り返|反省|活か|生か)|学んだこと|成長した点|改善したこと|振り返って/.test(mainQuestion)
-  ) {
-    applicableAxes.push("growth");
-  }
-  return applicableAxes;
-}
-
-export function getLengthScoreCap(answerChars: number, charLimit?: number): number | null {
+export function getLengthScoreCap(
+  answerChars: number,
+  charLimit?: number,
+  limitType: CharLimitType = "max"
+): number | null {
   if (!charLimit) return null;
   const ratio = Math.max(0, answerChars / charLimit);
 
-  if (ratio < 0.5) return Math.min(35, Math.round(((ratio / 0.5) * 35) / 5) * 5);
-  if (ratio < 0.8) return 40 + Math.round((((ratio - 0.5) / 0.3) * 25) / 5) * 5;
-  if (ratio < 0.9) return 70 + Math.round((((ratio - 0.8) / 0.1) * 10) / 5) * 5;
-  return 85 + Math.round((((Math.min(ratio, 1) - 0.9) / 0.1) * 15) / 5) * 5;
+  // 字数超過: 「以内」指定は超過した時点で違反、「程度・前後」指定は1割までの超過を許容する。
+  const overflowTolerance = limitType === "approx" ? 1.1 : 1;
+  if (ratio > overflowTolerance) {
+    return ratio <= overflowTolerance + 0.1 ? 65 : 35;
+  }
+
+  const effectiveRatio = Math.min(ratio, 1);
+  if (effectiveRatio < 0.5) return Math.min(35, Math.round(((effectiveRatio / 0.5) * 35) / 5) * 5);
+  if (effectiveRatio < 0.8) return 40 + Math.round((((effectiveRatio - 0.5) / 0.3) * 25) / 5) * 5;
+  if (effectiveRatio < 0.9) return 70 + Math.round((((effectiveRatio - 0.8) / 0.1) * 10) / 5) * 5;
+  return 85 + Math.round((((effectiveRatio - 0.9) / 0.1) * 15) / 5) * 5;
 }

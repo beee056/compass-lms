@@ -11,7 +11,7 @@ import {
   SearchCheck,
   Trash2
 } from "lucide-react";
-import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
+import { RUBRICS, describeTotalScoreFormula, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion } from "@/lib/practice-evaluation";
 
 const KIND_OPTIONS: PracticeKind[] = ["志望理由書", "小論文", "面接"];
@@ -233,7 +233,7 @@ export default function GuidedPracticeLibrary({ questions }: GuidedPracticeLibra
                   <p className="mt-1 text-xs font-bold text-slate-600">{activeMeta.note}</p>
                 </div>
                 <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-[#17202a] ring-1 ring-black/5">
-                  共通60% + 固有40%
+                  {describeTotalScoreFormula(activeKind).replace("総合 = ", "")}
                 </span>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">

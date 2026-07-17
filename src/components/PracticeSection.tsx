@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
-import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
+import { RUBRICS, describeTotalScoreFormula, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion, getInterviewResponseMetrics } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 
@@ -311,7 +311,7 @@ export default function PracticeSection({
               <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
                 <h4 className="font-bold text-blue-900 text-sm flex items-center gap-2 mb-2">
                   <BookOpen className="h-4 w-4" />
-                  「{kind}」の評価軸（各軸0〜100点 / 総合 = 共通平均60% + 固有平均40%）
+                  「{kind}」の評価軸（各軸0〜100点 / {describeTotalScoreFormula(kind)}）
                 </h4>
                 <div className="text-xs text-blue-800/80 space-y-1">
                   <p>
@@ -491,7 +491,7 @@ export default function PracticeSection({
                     <h3 className="font-bold text-slate-800 line-clamp-1">{record.prompt}</h3>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs text-slate-500 font-semibold mb-1">総合評価（共通60%+固有40%）</div>
+                    <div className="text-xs text-slate-500 font-semibold mb-1">総合評価（100点満点）</div>
                     <div className={`text-2xl font-black ${scoreColor(record.score ?? 0)}`}>
                       {record.score}
                       <span className="text-sm font-bold text-slate-400 ml-1">/ 100</span>
@@ -530,7 +530,7 @@ export default function PracticeSection({
                               </div>
                             ) : (
                               <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-400">
-                                対面評価
+                                {axis.aiEvaluable === true ? "今回対象外" : "対面評価"}
                               </span>
                             )}
                           </div>

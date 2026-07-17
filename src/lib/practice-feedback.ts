@@ -19,6 +19,9 @@ interface StructuredPracticeFeedback {
     key: string;
     label: string;
     group: string;
+    aiEvaluable?: boolean;
+    // v5以降: 設問依存軸の適用可否（false = 設問が求めていないため評価対象外）
+    applicable?: boolean | null;
     score?: number | null;
     level: number | null;
     levelLabel?: string | null;

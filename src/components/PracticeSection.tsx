@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
-import { getInterviewResponseMetrics } from "@/lib/practice-evaluation";
+import { getInterviewMainQuestion, getInterviewResponseMetrics } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
@@ -73,7 +73,7 @@ export default function PracticeSection({
     if (q) {
       const k = KIND_OPTIONS.includes(q.category) ? (q.category as PracticeKind) : "志望理由書";
       setKind(k);
-      setPromptText(q.prompt);
+      setPromptText(k === "面接" ? getInterviewMainQuestion(q.prompt) : q.prompt);
       if (q.university) setUniversityName(q.university);
     }
   };
@@ -277,14 +277,14 @@ export default function PracticeSection({
                     {rubric.specificAxes.map((a) => a.label + (a.aiEvaluable ? "" : "（対面評価）")).join(" / ")}
                   </p>
                   {kind === "面接" && (
-                    <p className="text-blue-700/70">※ノンバーバル・緊張制御はテキスト演習では評価対象外です（対面練習でメンターが評価）。</p>
+                    <p className="text-blue-700/70">※一問一答で練習します。主質問にだけ答え、深掘りは回答後に次の1問として行います。質問内容に関係する軸だけを採点します。</p>
                   )}
                 </div>
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="promptText" className="text-slate-700 font-semibold text-sm">
-                  {kind === "面接" ? "面接の質問（複数可）" : "設問（テーマ）"}
+                  {kind === "面接" ? "面接の主質問（1問）" : "設問（テーマ）"}
                 </Label>
                 <Textarea
                   id="promptText"
@@ -292,7 +292,7 @@ export default function PracticeSection({
                   onChange={(e) => setPromptText(e.target.value)}
                   placeholder={
                     kind === "面接"
-                      ? "例：本学を志望した理由を教えてください。／高校時代に最も力を入れたことは？"
+                      ? "例：本学を志望した理由を教えてください。"
                       : "例：AI技術の進化が社会に与える影響について、あなたの考えを述べなさい。（800字）"
                   }
                   required
@@ -303,7 +303,7 @@ export default function PracticeSection({
 
               <div className="grid gap-2">
                 <Label htmlFor="answer" className="text-slate-700 font-semibold text-sm">
-                  {kind === "面接" ? "あなたの回答（Q: 質問 / A: 回答 の形式推奨）" : "あなたの解答"}
+                  {kind === "面接" ? "この質問への回答" : "あなたの解答"}
                 </Label>
                 <Textarea
                   id="answer"
@@ -311,7 +311,7 @@ export default function PracticeSection({
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder={
                     kind === "面接"
-                      ? "Q: 本学を志望した理由を教えてください。\nA: 私は〜"
+                      ? "私は〜"
                       : "解答を入力してください..."
                   }
                   required

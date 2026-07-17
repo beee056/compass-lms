@@ -33,6 +33,8 @@ const TASK_SIGNALS: Array<{ key: string; pattern: RegExp }> = [
 ];
 
 const METADATA_SECTION = /\n*【(?:難易度|NotebookLM参照|出典)】[\s\S]*$/u;
+const INTERVIEW_FOLLOW_UP_SECTION =
+  /\n*【次ターン用の深掘り候補（初回回答の必須要素ではない）】[\s\S]*?(?=\n*【採点ポイント】|$)/u;
 const MIN_RELATED_SIMILARITY = 0.05;
 
 function normalizeText(value: string): string {
@@ -75,7 +77,10 @@ function taskScore(query: Set<string>, candidate: Set<string>): number {
 }
 
 export function cleanModelAnswer(value: string): string {
-  return value.replace(METADATA_SECTION, "").trim();
+  return value
+    .replace(INTERVIEW_FOLLOW_UP_SECTION, "\n")
+    .replace(METADATA_SECTION, "")
+    .trim();
 }
 
 export function includePrimaryReferenceCandidate(

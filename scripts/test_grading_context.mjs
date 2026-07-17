@@ -95,6 +95,24 @@ test("NotebookLMの管理用メタデータを採点参照から除外する", (
   assert.equal(cleanModelAnswer(value), "主張と根拠を明確にする。");
 });
 
+test("面接の次ターン用深掘り候補を初回回答の採点参照から除外する", () => {
+  const value = [
+    "結論と理由を端的に答える。",
+    "",
+    "【次ターン用の深掘り候補（初回回答の必須要素ではない）】",
+    "- その判断の根拠は何ですか。",
+    "- 経験から何を学びましたか。",
+    "",
+    "【採点ポイント】",
+    "主質問へ直接答えているか。"
+  ].join("\n");
+
+  const cleaned = cleanModelAnswer(value);
+  assert.doesNotMatch(cleaned, /次ターン用|判断の根拠|経験から何を学び/);
+  assert.match(cleaned, /【採点ポイント】/);
+  assert.match(cleaned, /主質問へ直接答えているか/);
+});
+
 test("参照コンテキストは役割をJSONで明示し、空の模範解答を含めない", () => {
   const references = selectGradingReferences(candidates[0].prompt, candidates, {
     questionId: "selected",

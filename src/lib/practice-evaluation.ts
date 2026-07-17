@@ -78,6 +78,55 @@ export function containsInterviewCharacterLimit(promptText: string): boolean {
   );
 }
 
+function getInterviewMainQuestionBlock(promptText: string): string {
+  const normalized = promptText.trim();
+  const followUpStart = normalized.search(/[（(]\s*(?:深掘り|追加質問)\s*[:：]/);
+  const withoutBundledFollowUp = followUpStart >= 0 ? normalized.slice(0, followUpStart).trim() : normalized;
+  const mainLines: string[] = [];
+  for (const line of withoutBundledFollowUp.split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+    if (/^(?:深掘り|追加質問)\s*[:：]/.test(trimmedLine)) break;
+    if (trimmedLine) mainLines.push(trimmedLine);
+  }
+  return (mainLines.length > 0 ? mainLines : [withoutBundledFollowUp]).join("\n").trim();
+}
+
+export function getInterviewMainQuestion(promptText: string): string {
+  return getInterviewMainQuestionBlock(promptText)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^Q\s*[:：]\s*/i, ""))
+    .join("\n")
+    .trim();
+}
+
+export function hasMultipleInterviewQuestions(promptText: string): boolean {
+  const mainQuestionBlock = getInterviewMainQuestionBlock(promptText);
+  const questionMarkCount = (mainQuestionBlock.match(/[?？]/g) ?? []).length;
+  const labeledQuestionCount = (mainQuestionBlock.match(/^\s*Q\s*[:：]/gim) ?? []).length;
+  const requestEndingCount = (
+    mainQuestionBlock.match(/(?:教えてください|述べてください|説明してください|答えてください|話してください|ですか|ますか|述べよ|説明せよ)/g) ?? []
+  ).length;
+  return questionMarkCount > 1 || labeledQuestionCount > 1 || requestEndingCount > 1;
+}
+
+const INTERVIEW_ALWAYS_EVALUATED_AXES = ["logicStructure", "concreteness", "expression", "dialogue"];
+
+export function getInterviewApplicableAxisKeys(promptText: string): string[] {
+  const mainQuestion = getInterviewMainQuestion(promptText);
+  const applicableAxes = [...INTERVIEW_ALWAYS_EVALUATED_AXES];
+  if (
+    /(?:あなた|自身|自分).{0,12}(?:経験|志望|強み|弱み|価値観|活動|取り組み|将来(?:像|の目標|したいこと|やりたいこと))|(?:経験|志望理由|強み|弱み|価値観|活動|取り組み|将来像|将来の目標)(?:を|について).{0,12}(?:教え|話し|述べ)/.test(mainQuestion)
+  ) {
+    applicableAxes.push("selfUnderstanding");
+  }
+  if (
+    /(?:失敗|経験|活動|取り組み).{0,15}(?:学び|学ん|成長|改善|振り返|反省|活か|生か)|学んだこと|成長した点|改善したこと|振り返って/.test(mainQuestion)
+  ) {
+    applicableAxes.push("growth");
+  }
+  return applicableAxes;
+}
+
 export function getLengthScoreCap(answerChars: number, charLimit?: number): number | null {
   if (!charLimit) return null;
   const ratio = Math.max(0, answerChars / charLimit);

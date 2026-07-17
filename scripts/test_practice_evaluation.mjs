@@ -4,7 +4,10 @@ import {
   countCharacters,
   containsInterviewCharacterLimit,
   estimateInterviewResponseSeconds,
+  getInterviewApplicableAxisKeys,
+  getInterviewMainQuestion,
   getInterviewResponseMetrics,
+  hasMultipleInterviewQuestions,
   getLengthScoreCap,
   inferCharLimit,
   resolveEffectiveCharLimit
@@ -77,4 +80,50 @@ test("generated interview prompts reject character-count requirements", () => {
   assert.equal(containsInterviewCharacterLimit("文字数は800を目安とします"), true);
   assert.equal(containsInterviewCharacterLimit("60秒程度で答えてください"), false);
   assert.equal(containsInterviewCharacterLimit("漢字で氏名を書いてください"), false);
+});
+
+test("interview grading uses only the first main question", () => {
+  assert.equal(
+    getInterviewMainQuestion("社会が変化しても守るべきものは何ですか。（深掘り：根拠、別の選択肢、大学での応用）"),
+    "社会が変化しても守るべきものは何ですか。"
+  );
+  assert.equal(getInterviewMainQuestion("Q: 志望理由を教えてください。\n深掘り：なぜ本学ですか。"), "志望理由を教えてください。");
+  assert.equal(
+    getInterviewMainQuestion("次の社会状況を踏まえてください。\nあなたの考えを教えてください。"),
+    "次の社会状況を踏まえてください。\nあなたの考えを教えてください。"
+  );
+  assert.equal(
+    getInterviewMainQuestion("次の地域課題を前提にしてください。\nQ: あなたならどのように対応しますか？"),
+    "次の地域課題を前提にしてください。\nあなたならどのように対応しますか？"
+  );
+  assert.equal(hasMultipleInterviewQuestions("志望理由は何ですか？なぜ本学ですか？"), true);
+  assert.equal(hasMultipleInterviewQuestions("志望理由を教えてください。入学後に何をしたいですか？"), true);
+  assert.equal(hasMultipleInterviewQuestions("志望理由と、その背景を教えてください。"), false);
+  assert.equal(hasMultipleInterviewQuestions("まず資料を確認してください。\nその上で、あなたの考えを説明してください。"), false);
+  assert.equal(hasMultipleInterviewQuestions("Q: 志望理由を述べよ。\nQ: 入学後の目標を述べよ。"), true);
+  assert.equal(hasMultipleInterviewQuestions("Q: 高校時代の活動について。\nQ: 入学後の目標について。"), true);
+  assert.equal(hasMultipleInterviewQuestions("Q: 志望理由を教えてください。\n深掘り：\nQ: なぜ本学ですか。"), false);
+});
+
+test("interview evaluates personal and growth axes only when the main question asks for them", () => {
+  assert.deepEqual(
+    getInterviewApplicableAxisKeys("社会が変化しても守るべきものは何ですか。"),
+    ["logicStructure", "concreteness", "expression", "dialogue"]
+  );
+  assert.deepEqual(
+    getInterviewApplicableAxisKeys("あなたは社会の変化についてどう考えますか。"),
+    ["logicStructure", "concreteness", "expression", "dialogue"]
+  );
+  assert.deepEqual(
+    getInterviewApplicableAxisKeys("あなたが将来のAI社会をどう考えますか。"),
+    ["logicStructure", "concreteness", "expression", "dialogue"]
+  );
+  assert.deepEqual(
+    getInterviewApplicableAxisKeys("大学で何を学びたいですか。"),
+    ["logicStructure", "concreteness", "expression", "dialogue"]
+  );
+  assert.deepEqual(
+    getInterviewApplicableAxisKeys("あなたが失敗から学び、次に活かした経験を教えてください。"),
+    ["logicStructure", "concreteness", "expression", "dialogue", "selfUnderstanding", "growth"]
+  );
 });

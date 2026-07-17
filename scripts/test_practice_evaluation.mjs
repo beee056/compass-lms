@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   countCharacters,
+  containsInterviewCharacterLimit,
+  estimateInterviewResponseSeconds,
+  getInterviewResponseMetrics,
   getLengthScoreCap,
-  inferCharLimit
+  inferCharLimit,
+  resolveEffectiveCharLimit
 } from "../src/lib/practice-evaluation.ts";
 
 test("countCharacters counts Unicode code points", () => {
@@ -35,4 +39,42 @@ test("inferCharLimit accepts repeated identical limits and rejects ambiguity", (
   assert.equal(inferCharLimit("全体を800字以内で、答案は800字以内とする"), 800);
   assert.equal(inferCharLimit("全体を800字以内、要約を200字以内で書く"), undefined);
   assert.equal(inferCharLimit("字数指定なし"), undefined);
+});
+
+test("interview ignores explicit and embedded character limits", () => {
+  assert.equal(resolveEffectiveCharLimit("面接", "800字以内で答えてください", 800), undefined);
+  assert.equal(resolveEffectiveCharLimit("小論文", "800字以内で論じなさい"), 800);
+  assert.equal(resolveEffectiveCharLimit("志望理由書", "自由記述", 600), 600);
+});
+
+test("interview response length is expressed as estimated speaking time", () => {
+  assert.equal(estimateInterviewResponseSeconds(0), 0);
+  assert.equal(estimateInterviewResponseSeconds(150), 30);
+  assert.equal(estimateInterviewResponseSeconds(233), 47);
+  assert.equal(estimateInterviewResponseSeconds(300), 60);
+});
+
+test("interview response metrics report total and per-answer speaking time", () => {
+  const metrics = getInterviewResponseMetrics(`Q: 志望理由は？\nA: ${"あ".repeat(150)}\nQ: 強みは？\nA: ${"い".repeat(150)}`);
+
+  assert.equal(metrics.responseCount, 2);
+  assert.equal(metrics.answerChars, 301);
+  assert.equal(metrics.totalSeconds, 60);
+  assert.equal(metrics.averageSeconds, 30);
+  assert.deepEqual(getInterviewResponseMetrics(""), {
+    answerChars: 0,
+    responseCount: 0,
+    totalSeconds: 0,
+    averageSeconds: 0
+  });
+});
+
+test("generated interview prompts reject character-count requirements", () => {
+  assert.equal(containsInterviewCharacterLimit("800字以内で答えてください"), true);
+  assert.equal(containsInterviewCharacterLimit("８００字程度で述べてください"), true);
+  assert.equal(containsInterviewCharacterLimit("八百字以内で述べてください"), true);
+  assert.equal(containsInterviewCharacterLimit("回答は500文字前後"), true);
+  assert.equal(containsInterviewCharacterLimit("文字数は800を目安とします"), true);
+  assert.equal(containsInterviewCharacterLimit("60秒程度で答えてください"), false);
+  assert.equal(containsInterviewCharacterLimit("漢字で氏名を書いてください"), false);
 });

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
+import { getInterviewResponseMetrics } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
@@ -64,6 +65,7 @@ export default function PracticeSection({
   const [records] = useState(initialRecords || []);
 
   const rubric = RUBRICS[kind];
+  const interviewMetrics = kind === "面接" ? getInterviewResponseMetrics(answer) : null;
 
   const handleBankSelect = (questionId: string) => {
     setSelectedQuestionId(questionId);
@@ -84,7 +86,7 @@ export default function PracticeSection({
     startTransition(async () => {
       const result = await evaluateWithRubric(studentId, kind, promptText, answer, {
         universityName: universityName.trim() || undefined,
-        charLimit: charLimit ? parseInt(charLimit, 10) || undefined : undefined,
+        charLimit: kind !== "面接" && charLimit ? parseInt(charLimit, 10) || undefined : undefined,
         questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined
       });
       if (result.success) {
@@ -315,7 +317,11 @@ export default function PracticeSection({
                   required
                   className="border-slate-200 min-h-[240px]"
                 />
-                <div className="text-right text-xs text-slate-400">現在の文字数: {Array.from(answer).length} 字</div>
+                <div className="text-right text-xs text-slate-400">
+                  {kind === "面接" && interviewMetrics
+                    ? `推定発話時間: 合計約${interviewMetrics.totalSeconds}秒 / ${interviewMetrics.responseCount}回答・平均約${interviewMetrics.averageSeconds}秒（参考）`
+                    : `現在の文字数: ${Array.from(answer).length}字`}
+                </div>
               </div>
             </div>
 

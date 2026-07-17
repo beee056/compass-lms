@@ -53,7 +53,10 @@ export default async function MaterialsPage() {
     <div className="min-h-[calc(100vh-80px)] bg-[#f7f8f4] p-4 md:p-8">
       <NotebookLmHub notebookUrl={NOTEBOOK_LM_URL} />
       <div className="mt-10">
-        <GuidedPracticeLibrary questions={questionBank} />
+        <GuidedPracticeLibrary
+          questions={questionBank}
+          practiceHref={user.studentProfile ? "/portal" : null}
+        />
       </div>
       {courses.length > 0 && (
         <div className="mx-auto mt-12 max-w-5xl border-t border-[#d8dee4] pt-10">

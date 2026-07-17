@@ -1,7 +1,7 @@
 "use client";
 import { toast } from "@/lib/toast";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { PenTool, Plus, Loader2, Sparkles, AlertCircle, BookOpen, Wand2, CheckCircle2, MinusCircle, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,10 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
 import { RUBRICS, describeTotalScoreFormula, type PracticeKind } from "@/lib/rubrics";
-import { getInterviewMainQuestion, getInterviewResponseMetrics } from "@/lib/practice-evaluation";
+import { getInterviewMainQuestion, getInterviewResponseMetrics, inferCharLimit } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
+
+interface QuestionDetail {
+  prompt: string;
+  modelAnswer: string | null;
+}
 
 // レベル別の配色
 const LEVEL_STYLE: Record<number, string> = {
@@ -56,6 +61,8 @@ export default function PracticeSection({
   const [promptText, setPromptText] = useState("");
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [questionDetails, setQuestionDetails] = useState<Record<string, QuestionDetail>>({});
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
 
   // 問題生成フォーム（メンター用）
   const [genKind, setGenKind] = useState<PracticeKind>("小論文");
@@ -67,17 +74,92 @@ export default function PracticeSection({
   const rubric = RUBRICS[kind];
   const interviewMetrics = kind === "面接" ? getInterviewResponseMetrics(answer) : null;
   const selectedQuestion = questionBank.find((q) => q.id === selectedQuestionId);
+  const selectedQuestionDetail = selectedQuestionId ? questionDetails[selectedQuestionId] : undefined;
 
-  const handleBankSelect = (questionId: string) => {
-    setSelectedQuestionId(questionId);
-    const q = questionBank.find((q) => q.id === questionId);
-    if (q) {
-      const k = KIND_OPTIONS.includes(q.category) ? (q.category as PracticeKind) : "志望理由書";
-      setKind(k);
-      setPromptText(k === "面接" ? getInterviewMainQuestion(q.prompt) : q.prompt);
-      if (q.university) setUniversityName(q.university);
+  // 選択中の演習種類に一致する問題だけを、五十音順で表示する
+  const bankQuestionsForKind = useMemo(() => {
+    return questionBank
+      .filter((q) => q.category === kind)
+      .sort((a, b) => String(a.title).localeCompare(String(b.title), "ja"));
+  }, [questionBank, kind]);
+
+  const applyQuestionDetail = (questionKind: PracticeKind, question: any, detail: QuestionDetail) => {
+    setPromptText(questionKind === "面接" ? getInterviewMainQuestion(detail.prompt) : detail.prompt);
+    if (question?.university) setUniversityName(question.university);
+    if (questionKind !== "面接") {
+      const inferredLimit = inferCharLimit(detail.prompt);
+      setCharLimit(inferredLimit ? String(inferredLimit) : "");
     }
   };
+
+  const handleBankSelect = async (questionId: string) => {
+    setSelectedQuestionId(questionId);
+    setError(null);
+    if (!questionId) {
+      setPromptText("");
+      return;
+    }
+    const q = questionBank.find((entry) => entry.id === questionId);
+    const k = q && KIND_OPTIONS.includes(q.category) ? (q.category as PracticeKind) : kind;
+    setKind(k);
+
+    const cached = questionDetails[questionId];
+    if (cached) {
+      applyQuestionDetail(k, q, cached);
+      return;
+    }
+    setPromptText("");
+    setIsDetailLoading(true);
+    try {
+      const response = await fetch(`/api/question-bank/${encodeURIComponent(questionId)}`);
+      if (!response.ok) throw new Error("設問の取得に失敗しました");
+      const detail = (await response.json()) as QuestionDetail;
+      setQuestionDetails((current) => ({ ...current, [questionId]: detail }));
+      applyQuestionDetail(k, q, detail);
+    } catch {
+      setError("設問の取得に失敗しました。もう一度選択してください");
+      setSelectedQuestionId("");
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const handleKindChange = (nextKind: PracticeKind) => {
+    setKind(nextKind);
+    // 種類を切り替えたら、不一致になった選択中の問題はリセットする
+    if (selectedQuestion && selectedQuestion.category !== nextKind) {
+      setSelectedQuestionId("");
+      setPromptText("");
+    }
+  };
+
+  // 教材ライブラリ等から ?practiceQuestion=<id> で遷移した場合、その問題を選択した状態で開く。
+  // 教材側で書いた下書きがあれば解答欄へ引き継ぐ。
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const questionId = params.get("practiceQuestion");
+    if (questionId && questionBank.some((q) => q.id === questionId)) {
+      setOpen(true);
+      setInputMode("bank");
+      void handleBankSelect(questionId);
+      try {
+        const stored = sessionStorage.getItem("practice-draft");
+        if (stored) {
+          const parsed = JSON.parse(stored) as { questionId?: string; draft?: string };
+          if (parsed.questionId === questionId && parsed.draft?.trim()) {
+            setAnswer(parsed.draft);
+          }
+          sessionStorage.removeItem("practice-draft");
+        }
+      } catch {
+        // 下書きの引き継ぎに失敗しても演習自体は続行できる
+      }
+      params.delete("practiceQuestion");
+      const query = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,23 +288,34 @@ export default function PracticeSection({
 
               {inputMode === "bank" && (
                 <div className="grid gap-3">
-                  <Label className="text-slate-700 font-semibold text-sm">演習問題を選択</Label>
+                  <Label className="text-slate-700 font-semibold text-sm">
+                    演習問題を選択
+                    <span className="ml-2 font-medium text-slate-400">（「{kind}」の問題 {bankQuestionsForKind.length}問）</span>
+                  </Label>
                   <select
                     value={selectedQuestionId}
                     onChange={(e) => handleBankSelect(e.target.value)}
                     className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                   >
                     <option value="">練習したいテーマを選んでください</option>
-                    {questionBank.map((q: any) => (
+                    {bankQuestionsForKind.map((q: any) => (
                       <option key={q.id} value={q.id}>
-                        [{q.category}]{q.source === "AI_GENERATED" ? "（AI生成）" : q.source === "NOTEBOOKLM" ? "（NotebookLM）" : ""} {q.title}
+                        {q.title}
                       </option>
                     ))}
                   </select>
-                  {questionBank.length === 0 && (
-                    <p className="text-xs text-slate-400">問題バンクが空です。「自分で設問を入力する」をご利用ください。</p>
+                  {bankQuestionsForKind.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      「{kind}」の問題がまだありません。演習の種類を変えるか、「自分で設問を入力する」をご利用ください。
+                    </p>
                   )}
-                  {selectedQuestion && (
+                  {selectedQuestionId && isDetailLoading && (
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      設問を読み込んでいます...
+                    </div>
+                  )}
+                  {selectedQuestion && selectedQuestionDetail && (
                     <details open className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
                       <summary className="flex cursor-pointer list-none items-start justify-between gap-3 bg-slate-50 px-4 py-3">
                         <span className="min-w-0">
@@ -246,7 +339,7 @@ export default function PracticeSection({
                             {kind === "面接" ? "主質問" : "設問"}
                           </p>
                           <p className="whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm font-medium leading-7 text-slate-700">
-                            {kind === "面接" ? getInterviewMainQuestion(selectedQuestion.prompt) : selectedQuestion.prompt}
+                            {kind === "面接" ? getInterviewMainQuestion(selectedQuestionDetail.prompt) : selectedQuestionDetail.prompt}
                           </p>
                         </div>
                         <details className="group/answer rounded-md border border-blue-100 bg-blue-50/40">
@@ -255,9 +348,9 @@ export default function PracticeSection({
                             <ChevronDown className="h-4 w-4 shrink-0 text-blue-400 transition-transform group-open/answer:rotate-180" />
                           </summary>
                           <div className="border-t border-blue-100 px-3 py-3">
-                            {selectedQuestion.modelAnswer ? (
+                            {selectedQuestionDetail.modelAnswer ? (
                               <p className="whitespace-pre-wrap text-sm font-medium leading-7 text-slate-700">
-                                {selectedQuestion.modelAnswer}
+                                {selectedQuestionDetail.modelAnswer}
                               </p>
                             ) : (
                               <p className="text-sm font-medium text-slate-500">回答例はまだ準備中です。</p>
@@ -275,9 +368,8 @@ export default function PracticeSection({
                   <Label className="text-slate-700 font-semibold text-sm">演習の種類</Label>
                   <select
                     value={kind}
-                    onChange={(e) => setKind(e.target.value as PracticeKind)}
-                    disabled={inputMode === "bank" && !!selectedQuestionId}
-                    className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm disabled:bg-slate-50"
+                    onChange={(e) => handleKindChange(e.target.value as PracticeKind)}
+                    className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                   >
                     {KIND_OPTIONS.map((k) => (
                       <option key={k} value={k}>{k}</option>
@@ -328,7 +420,7 @@ export default function PracticeSection({
                 </div>
               </div>
 
-              {!(inputMode === "bank" && selectedQuestion) && (
+              {!(inputMode === "bank" && selectedQuestionId) && (
                 <div className="grid gap-2">
                   <Label htmlFor="promptText" className="text-slate-700 font-semibold text-sm">
                     {kind === "面接" ? "面接の主質問（1問）" : "設問（テーマ）"}
@@ -376,7 +468,7 @@ export default function PracticeSection({
               <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">
                 キャンセル
               </Button>
-              <Button type="submit" disabled={isPending} className="bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[130px]">
+              <Button type="submit" disabled={isPending || isDetailLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[130px]">
                 {isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -460,12 +552,13 @@ export default function PracticeSection({
             <p className="text-slate-400 text-sm mt-1">「新しい演習を始める」から解答を入力して、AIの添削を受けてみましょう。</p>
           </Card>
         ) : (
-          records.map((record) => {
+          records.map((record, recordIndex) => {
             const feedback = parseFeedback(record.feedback);
             const isV2 = isStructuredPracticeFeedback(feedback);
             return (
               <Card key={record.id} className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
-                <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
+                <details open={recordIndex === 0} className="group/record">
+                  <summary className="cursor-pointer list-none p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4 transition-colors hover:bg-slate-100/60">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs py-0.5 px-2 bg-blue-100 text-blue-700 font-bold rounded-sm">{record.type}</span>
@@ -490,14 +583,34 @@ export default function PracticeSection({
                     </div>
                     <h3 className="font-bold text-slate-800 line-clamp-1">{record.prompt}</h3>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs text-slate-500 font-semibold mb-1">総合評価（100点満点）</div>
-                    <div className={`text-2xl font-black ${scoreColor(record.score ?? 0)}`}>
-                      {record.score}
-                      <span className="text-sm font-bold text-slate-400 ml-1">/ 100</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <div className="text-xs text-slate-500 font-semibold mb-1">総合評価（100点満点）</div>
+                      <div className={`text-2xl font-black ${scoreColor(record.score ?? 0)}`}>
+                        {record.score}
+                        <span className="text-sm font-bold text-slate-400 ml-1">/ 100</span>
+                      </div>
+                    </div>
+                    <ChevronDown className="h-5 w-5 text-slate-400 transition-transform group-open/record:rotate-180" />
+                  </div>
+                  </summary>
+
+                <details className="mx-5 mt-4 rounded-lg border border-slate-200 bg-slate-50/60">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm font-bold text-slate-700">
+                    設問と自分の解答（{Array.from(String(record.answer ?? "")).length}字）
+                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                  </summary>
+                  <div className="space-y-3 border-t border-slate-200 p-4">
+                    <div>
+                      <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">設問</p>
+                      <p className="whitespace-pre-wrap rounded-md bg-white p-3 text-sm font-medium leading-7 text-slate-700">{record.prompt}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">自分の解答</p>
+                      <p className="whitespace-pre-wrap rounded-md bg-white p-3 text-sm font-medium leading-7 text-slate-700">{record.answer}</p>
                     </div>
                   </div>
-                </div>
+                </details>
 
                 {isV2 ? (
                   <div className="p-5">
@@ -656,6 +769,7 @@ export default function PracticeSection({
                     )}
                   </div>
                 ) : null}
+                </details>
               </Card>
             );
           })

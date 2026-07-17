@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   Search,
   SearchCheck,
+  Sparkles,
   Trash2
 } from "lucide-react";
 import { RUBRICS, describeTotalScoreFormula, type PracticeKind } from "@/lib/rubrics";
@@ -53,9 +54,11 @@ interface PracticeQuestionDetail {
 
 interface GuidedPracticeLibraryProps {
   questions: PracticeQuestion[];
+  // 生徒の場合はAI添削ページ（/portal）へのリンク。メンター等では null で非表示。
+  practiceHref?: string | null;
 }
 
-export default function GuidedPracticeLibrary({ questions }: GuidedPracticeLibraryProps) {
+export default function GuidedPracticeLibrary({ questions, practiceHref = null }: GuidedPracticeLibraryProps) {
   const [activeKind, setActiveKind] = useState<PracticeKind>("志望理由書");
   const [query, setQuery] = useState("");
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
@@ -328,42 +331,40 @@ export default function GuidedPracticeLibrary({ questions }: GuidedPracticeLibra
                               {detailError}
                             </div>
                           ) : detail ? (
-                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                              <div className="space-y-4">
-                                <section>
-                                  <h4 className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">設問</h4>
-                                  <p className="mt-2 whitespace-pre-wrap rounded-md bg-[#fbfcf8] p-4 text-sm font-medium leading-7 text-slate-700 ring-1 ring-[#e3e7e0]">
-                                    {displayPrompt}
-                                  </p>
-                                </section>
+                            <div className="space-y-4">
+                              <section>
+                                <h4 className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">設問</h4>
+                                <p className="mt-2 whitespace-pre-wrap rounded-md bg-[#fbfcf8] p-4 text-sm font-medium leading-7 text-slate-700 ring-1 ring-[#e3e7e0]">
+                                  {displayPrompt}
+                                </p>
+                              </section>
 
-                                <section>
-                                  <div className="mb-2 flex items-center justify-between gap-3">
-                                    <h4 className="text-sm font-black text-[#17202a]">下書き</h4>
-                                    {draft && (
-                                      <button
-                                        type="button"
-                                        onClick={() => clearDraft(question.id)}
-                                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                        消す
-                                      </button>
-                                    )}
-                                  </div>
-                                  <textarea
-                                    value={draft}
-                                    onChange={(event) => updateDraft(question.id, event.target.value)}
-                                    placeholder={activeKind === "面接" ? "この1問への回答を、まず60〜90秒程度で話すつもりで書いてみる" : "ここに自分の解答を書いてから、回答例と照合する"}
-                                    className="min-h-[190px] w-full resize-y rounded-md border border-[#d8dee4] bg-white p-3 text-sm font-medium leading-7 text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15"
-                                  />
-                                  <p className="mt-1 text-right text-xs font-bold text-slate-400">
-                                    {activeKind === "面接" ? getInterviewDraftLabel(draft) : `${Array.from(draft).length}字`}
-                                  </p>
-                                </section>
-                              </div>
+                              <section>
+                                <div className="mb-2 flex items-center justify-between gap-3">
+                                  <h4 className="text-sm font-black text-[#17202a]">下書き</h4>
+                                  {draft && (
+                                    <button
+                                      type="button"
+                                      onClick={() => clearDraft(question.id)}
+                                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      消す
+                                    </button>
+                                  )}
+                                </div>
+                                <textarea
+                                  value={draft}
+                                  onChange={(event) => updateDraft(question.id, event.target.value)}
+                                  placeholder={activeKind === "面接" ? "この1問への回答を、まず60〜90秒程度で話すつもりで書いてみる" : "ここに自分の解答を書いてから、回答例と照合する"}
+                                  className="min-h-[190px] w-full resize-y rounded-md border border-[#d8dee4] bg-white p-3 text-sm font-medium leading-7 text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15"
+                                />
+                                <p className="mt-1 text-right text-xs font-bold text-slate-400">
+                                  {activeKind === "面接" ? getInterviewDraftLabel(draft) : `${Array.from(draft).length}字`}
+                                </p>
+                              </section>
 
-                              <aside className="space-y-3">
+                              <div className="grid gap-3 md:grid-cols-2">
                                 <div className="rounded-md border border-[#e3e7e0] bg-[#fbfcf8] p-3">
                                   <h4 className="flex items-center gap-2 text-sm font-black text-[#17202a]">
                                     <CheckCircle2 className="h-4 w-4 text-[#137a5b]" />
@@ -379,7 +380,7 @@ export default function GuidedPracticeLibrary({ questions }: GuidedPracticeLibra
                                   </ul>
                                 </div>
 
-                                <div className="rounded-md border border-[#d8dee4] bg-white">
+                                <div className="rounded-md border border-[#d8dee4] bg-white self-start">
                                   <button
                                     type="button"
                                     onClick={() => toggleAnswer(question.id)}
@@ -399,7 +400,32 @@ export default function GuidedPracticeLibrary({ questions }: GuidedPracticeLibra
                                     </div>
                                   )}
                                 </div>
-                              </aside>
+                              </div>
+
+                              {practiceHref && (
+                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#cbd4ff] bg-[#eef1ff] p-3">
+                                  <p className="text-xs font-bold leading-5 text-[#3346a3]">
+                                    書き上がったら、この問題のままAI添削へ進めます（下書きも引き継がれます）。
+                                  </p>
+                                  <a
+                                    href={`${practiceHref}?practiceQuestion=${encodeURIComponent(question.id)}`}
+                                    onClick={() => {
+                                      try {
+                                        sessionStorage.setItem(
+                                          "practice-draft",
+                                          JSON.stringify({ questionId: question.id, draft })
+                                        );
+                                      } catch {
+                                        // sessionStorageが使えない環境では下書きなしで遷移する
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-md bg-[#3346a3] px-4 py-2 text-sm font-black text-white transition-colors hover:bg-[#2a3a8c]"
+                                  >
+                                    <Sparkles className="h-4 w-4" />
+                                    この問題でAI添削を受ける
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           ) : null}
                         </div>

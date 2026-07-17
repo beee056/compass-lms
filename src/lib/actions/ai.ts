@@ -25,6 +25,7 @@ import {
   getInterviewResponseMetrics,
   hasMultipleInterviewQuestions,
   getLengthScoreCap,
+  getOverLimitTotalScoreCap,
   resolveEffectiveCharLimitSpec
 } from "../practice-evaluation";
 import {
@@ -327,6 +328,8 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
     const { object: evaluation } = await generateObject({
       model: getAIModel(),
       schema,
+      // 出力の安定性を優先（高温だと講評末尾に文字化け・重複が混入することがある）
+      temperature: 0.3,
       system: systemPrompt,
       prompt: `${effectiveUniversityName ? `<untrusted_request_metadata format="json">\n${serializeUntrustedData({ universityName: effectiveUniversityName })}\n</untrusted_request_metadata>\n\n` : ""}${gradingReferenceContext ? `<untrusted_reference_data format="json">\n${gradingReferenceContext}\n</untrusted_reference_data>\n\n` : ""}【設問/テーマ】\n${authoritativePromptText}\n\n【生徒の解答】\n${answer}`
     });
@@ -364,7 +367,14 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
     for (const [key, v] of Object.entries(axisResults)) {
       if (applicableAxisKeys.has(key)) scores[key] = v.score;
     }
-    const totalScore = computeTotalScore(scoringRubric, scores);
+    let totalScore = computeTotalScore(scoringRubric, scores);
+
+    // 字数超過は実際の入試では失格級のため、軸のキャップだけでなく総合点にも上限を掛ける
+    const overLimitTotalCap = kind !== "面接" ? getOverLimitTotalScoreCap(answerChars, charLimitSpec) : null;
+    if (overLimitTotalCap !== null && totalScore > overLimitTotalCap) {
+      totalScore = overLimitTotalCap;
+      evaluation.overallFeedback = `【字数超過】規定${effectiveCharLimit}字${charLimitLabel}に対して解答は${answerChars}字です。実際の入試では大幅減点や失格になり得るため、内容の評価にかかわらず総合点を${overLimitTotalCap}点を上限としています。まずは規定字数内に収める推敲を最優先してください。\n\n${evaluation.overallFeedback}`;
+    }
 
     // 保存形式 v5（v4に評価軸の適用可否と総合点方式を追加）
     const feedbackPayload = {
@@ -517,6 +527,7 @@ export async function generatePracticeQuestion(params: {
     const { object: q } = await generateObject({
       model: getAIModel(),
       schema,
+      temperature: 0.5,
       system: `あなたは大学受験の総合型選抜（旧AO入試）の出題・指導のプロです。日本語で出力してください。
 ${uni ? `対象は「${uni}」です。この大学・学部の実際の出題傾向（テーマや形式）とアドミッション・ポリシーを踏まえた、過去問に近い形式のオリジナル問題を作成してください。実在の過去問をそのまま複製してはいけません。` : "特定の大学を想定しない汎用的な良問を作成してください。"}`,
       prompt: `${kindInstruction}${theme ? `\n\n【扱うテーマ・分野】${theme}` : ""}`

@@ -183,6 +183,19 @@ export function hasMultipleInterviewQuestions(promptText: string): boolean {
   return independentQuestionCount > 1;
 }
 
+// 字数超過（「以内」は超過即、「程度・前後」は1割超）の場合、軸だけでなく総合点にも
+// 掛ける上限。実際の入試では字数超過は大幅減点・失格級であり、内容の良さで
+// 総合点が高止まりすると誤った学習シグナルになるため。
+export function getOverLimitTotalScoreCap(
+  answerChars: number,
+  spec?: CharLimitSpec
+): number | null {
+  if (!spec) return null;
+  const tolerance = spec.type === "approx" ? 1.1 : 1;
+  if (answerChars <= spec.limit * tolerance) return null;
+  return getLengthScoreCap(answerChars, spec.limit, spec.type);
+}
+
 export function getLengthScoreCap(
   answerChars: number,
   charLimit?: number,

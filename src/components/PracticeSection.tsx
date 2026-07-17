@@ -2,6 +2,7 @@
 import { toast } from "@/lib/toast";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { PenTool, Plus, Loader2, Sparkles, AlertCircle, BookOpen, Wand2, CheckCircle2, MinusCircle, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -69,7 +70,9 @@ export default function PracticeSection({
   const [genUniversity, setGenUniversity] = useState("");
   const [genTheme, setGenTheme] = useState("");
 
-  const [records] = useState(initialRecords || []);
+  const router = useRouter();
+  // router.refresh()でサーバーから渡し直される最新値をそのまま使う（stateに固定しない）
+  const records = initialRecords || [];
 
   const rubric = RUBRICS[kind];
   const interviewMetrics = kind === "面接" ? getInterviewResponseMetrics(answer) : null;
@@ -173,12 +176,13 @@ export default function PracticeSection({
         questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined
       });
       if (result.success) {
-        toast.success("AI添削が完了しました");
+        toast.success("AI添削が完了しました。結果は下の演習記録に表示されます");
         setOpen(false);
         setPromptText("");
         setAnswer("");
         setSelectedQuestionId("");
-        window.location.reload();
+        // ページ全体をリロードせず、サーバーコンポーネントだけ再取得する（スクロール位置を保持）
+        router.refresh();
       } else {
         setError(result.error ?? "添削に失敗しました");
       }
@@ -198,7 +202,7 @@ export default function PracticeSection({
         setGenOpen(false);
         setGenUniversity("");
         setGenTheme("");
-        window.location.reload();
+        router.refresh();
       } else {
         toast.error(result.error ?? "問題の生成に失敗しました");
       }

@@ -8,6 +8,7 @@ import {
   getInterviewResponseMetrics,
   hasMultipleInterviewQuestions,
   getLengthScoreCap,
+  getOverLimitTotalScoreCap,
   inferCharLimit,
   inferCharLimitSpec,
   resolveEffectiveCharLimit,
@@ -38,6 +39,21 @@ test("getLengthScoreCap penalizes exceeding an upper-bound (以内) limit", () =
   assert.equal(getLengthScoreCap(881, 800, "max"), 35);
   assert.equal(getLengthScoreCap(900, 800, "max"), 35);
   assert.equal(getLengthScoreCap(1600, 800, "max"), 35);
+});
+
+test("字数超過時は総合点にも上限を掛ける（超過なしはnull）", () => {
+  // 800字以内で893字（約1.12倍）→ 未達上限35点が総合点の上限になる
+  assert.equal(getOverLimitTotalScoreCap(893, { limit: 800, type: "max" }), 35);
+  // 超過1割以内 → 要改善上限65点
+  assert.equal(getOverLimitTotalScoreCap(850, { limit: 800, type: "max" }), 65);
+  // 規定内は総合点キャップなし
+  assert.equal(getOverLimitTotalScoreCap(800, { limit: 800, type: "max" }), null);
+  assert.equal(getOverLimitTotalScoreCap(400, { limit: 800, type: "max" }), null);
+  // 「程度」指定は1割まで許容
+  assert.equal(getOverLimitTotalScoreCap(880, { limit: 800, type: "approx" }), null);
+  assert.equal(getOverLimitTotalScoreCap(900, { limit: 800, type: "approx" }), 65);
+  // 規定字数が特定できない場合はキャップしない
+  assert.equal(getOverLimitTotalScoreCap(2000, undefined), null);
 });
 
 test("getLengthScoreCap tolerates small overruns for approximate (程度・前後) limits", () => {

@@ -1,6 +1,12 @@
 interface StructuredPracticeFeedback {
   version: number;
   universityName?: string | null;
+  essayProfile?: {
+    id: string;
+    version: number;
+    label: string;
+    taskTypes: string[];
+  } | null;
   universityProfile?: {
     id: string;
     version: number;

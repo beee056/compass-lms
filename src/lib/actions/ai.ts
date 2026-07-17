@@ -21,6 +21,10 @@ import {
   buildUniversityGradingProfileContext,
   resolveUniversityGradingProfile
 } from "../university-grading-profiles";
+import {
+  buildEssayGradingProfileContext,
+  resolveEssayGradingProfile
+} from "../essay-grading-profile";
 
 // -----------------------------------------------------------------------------
 // AI添削（ルーブリック方式）
@@ -109,10 +113,16 @@ export async function evaluateWithRubric(
     if (effectiveUniversityName && effectiveUniversityName.length > 100) {
       throw new ValidationError("大学・学部名は100字以内で指定してください");
     }
+    const essayProfile = resolveEssayGradingProfile({
+      kind,
+      promptText: authoritativePromptText
+    });
+    const essayProfileContext = buildEssayGradingProfileContext(essayProfile);
     const universityProfile = resolveUniversityGradingProfile({
       kind,
       universityName: effectiveUniversityName,
-      promptText: authoritativePromptText
+      promptText: authoritativePromptText,
+      taskTypes: essayProfile?.taskTypes
     });
     const universityProfileContext = buildUniversityGradingProfileContext(universityProfile);
 
@@ -178,6 +188,7 @@ ${axisText}
 
 【評価上の注意】
 ${notesText}
+${essayProfileContext ? `\n${essayProfileContext}` : ""}
 ${universityProfileContext ? `\n${universityProfileContext}` : ""}
 ${effectiveCharLimit ? `\n【規定字数と実測値】規定${effectiveCharLimit}字以内 / 解答${answerChars}字（システム計測値。この文字数を正として再計算しないこと）` : `\n【解答文字数】${answerChars}字（システム計測値。この文字数を正として再計算しないこと）`}
 ${gradingReferenceContext || effectiveUniversityName ? `
@@ -280,6 +291,14 @@ ${essayScoringRules ? `\n${essayScoringRules}` : ""}
       version: 3,
       kind,
       universityName: effectiveUniversityName || null,
+      essayProfile: essayProfile
+        ? {
+            id: essayProfile.id,
+            version: essayProfile.version,
+            label: essayProfile.label,
+            taskTypes: essayProfile.taskTypes
+          }
+        : null,
       universityProfile: universityProfile
         ? {
             id: universityProfile.id,
@@ -292,6 +311,13 @@ ${essayScoringRules ? `\n${essayScoringRules}` : ""}
       taskAnalysis: evaluation.taskAnalysis,
       grounding: {
         strategy: gradingReferences.length > 0 ? "question-bank-retrieval" : "rubric-only",
+        essayProfile: essayProfile
+          ? {
+              id: essayProfile.id,
+              version: essayProfile.version,
+              sourceReferences: essayProfile.sourceReferences
+            }
+          : null,
         universityProfile: universityProfile
           ? {
               id: universityProfile.id,

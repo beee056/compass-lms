@@ -419,6 +419,11 @@ export default function PracticeSection({
                       {isV2 && feedback.universityName && (
                         <span className="text-xs py-0.5 px-2 bg-slate-100 text-slate-600 font-bold rounded-sm">{feedback.universityName}</span>
                       )}
+                      {isV2 && feedback.essayProfile?.label && (
+                        <span className="text-xs py-0.5 px-2 bg-blue-100 text-blue-700 font-bold rounded-sm">
+                          {feedback.essayProfile.label}
+                        </span>
+                      )}
                       {isV2 && feedback.universityProfile?.label && (
                         <span className="text-xs py-0.5 px-2 bg-violet-100 text-violet-700 font-bold rounded-sm">
                           {feedback.universityProfile.label}

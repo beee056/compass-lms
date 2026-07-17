@@ -1,50 +1,39 @@
 export type UniversityProfileMatch = "universityName" | "prompt";
 
-export type SfcTaskType =
-  | "source_analysis"
-  | "problem_discovery"
-  | "solution_design"
-  | "quantitative_estimation"
-  | "interdisciplinary_synthesis"
-  | "metacognition_education";
+import type { EssayTaskType } from "./essay-grading-profile";
 
 export interface ResolvedUniversityGradingProfile {
   id: "keio-sfc-essay";
   version: 1;
   label: "慶應SFC専用基準";
   matchedBy: UniversityProfileMatch;
-  taskTypes: SfcTaskType[];
+  taskTypes: EssayTaskType[];
   sourceReferences: string[];
 }
 
 const SOURCE_REFERENCES = [
-  "trend-analysis-2010-2024",
-  "rubric-analysis-2013-2023",
-  "sfc-strategy-guide",
-  "sample-answer-2021"
+  "google-doc:1T73Sz1djBqV3XZJXUy6uNtkZLYaWbcq1ug1yuwmqCKM",
+  "google-doc:1LQlVdFAfYBrlxFblde9xeppGgrThKT7y6QDICEwImzo",
+  "google-drive-folder:1vm3Evp4L-vY3pNIG4d80o6h0kooci1bF",
+  "google-drive-folder:1wBXlMOJt1yCY3EEu9g__M9pFUR7v1ZC3"
 ];
 
-const TASK_TYPE_PATTERNS: Array<[SfcTaskType, RegExp]> = [
-  ["source_analysis", /資料|文献|図表|グラフ|写真|地図|読み取|比較|通底|関連/],
-  ["problem_discovery", /問題|課題|発見|定義|名(?:前|称)|本質|原因/],
-  ["solution_design", /提案|解決|方策|アイデア|設計|デザイン|図示|仕組み|計画|実行/],
-  ["quantitative_estimation", /推定|概算|フェルミ|算出|数量|数値|計算/],
-  ["interdisciplinary_synthesis", /学際|複数.{0,8}分野|技術.{0,12}社会|社会.{0,12}技術|文理|統合/],
-  ["metacognition_education", /SFC|大学|教育|カリキュラム|学び|研究|自己/]
+const SFC_CALIBRATION_TASK_TYPES: EssayTaskType[] = [
+  "problem_discovery",
+  "solution_design",
+  "interdisciplinary_synthesis",
+  "self_reflection"
 ];
 
 function normalize(value: string | null | undefined): string {
   return (value ?? "").normalize("NFKC").toLowerCase();
 }
 
-function detectTaskTypes(promptText: string): SfcTaskType[] {
-  return TASK_TYPE_PATTERNS.filter(([, pattern]) => pattern.test(promptText)).map(([type]) => type);
-}
-
 export function resolveUniversityGradingProfile(input: {
   kind: string;
   universityName?: string | null;
   promptText: string;
+  taskTypes?: EssayTaskType[];
 }): ResolvedUniversityGradingProfile | null {
   if (input.kind !== "小論文") return null;
 
@@ -66,7 +55,7 @@ export function resolveUniversityGradingProfile(input: {
     version: 1,
     label: "慶應SFC専用基準",
     matchedBy: universityMatch ? "universityName" : "prompt",
-    taskTypes: detectTaskTypes(promptText),
+    taskTypes: (input.taskTypes ?? []).filter((type) => SFC_CALIBRATION_TASK_TYPES.includes(type)),
     sourceReferences: [...SOURCE_REFERENCES]
   };
 }
@@ -76,15 +65,25 @@ export function buildUniversityGradingProfileContext(
 ): string {
   if (!profile) return "";
 
+  const calibrationGuidance: string[] = [];
+  if (profile.taskTypes.includes("problem_discovery")) {
+    calibrationGuidance.push("- 問題発見型では、既存の枠組みを問い直す問題設定の明確さを、設問が求める範囲で確認すること。");
+  }
+  if (profile.taskTypes.includes("solution_design")) {
+    calibrationGuidance.push("- 提案設計型では、再設計の意図、実行可能性、検証可能性を、設問が求める範囲で確認すること。");
+  }
+  if (profile.taskTypes.includes("interdisciplinary_synthesis")) {
+    calibrationGuidance.push("- 学際統合型では、複数分野の知見が実践上どう結び付くかを、設問が求める範囲で確認すること。");
+  }
+  if (profile.taskTypes.includes("self_reflection")) {
+    calibrationGuidance.push("- SFCでの学習・研究環境との接続を設問が明示する場合だけ、その具体性を確認すること。");
+  }
+  if (calibrationGuidance.length === 0) {
+    calibrationGuidance.push("- この設問には追加のSFC固有評価項目を設定せず、一般化された設問類型別基準だけで評価すること。");
+  }
+
   return `【${profile.label}】
-この基準は、慶應SFCの過去問分析・採点基準・解答例から一般化した補助基準である。過去問の特定年度の配点を推測せず、共通ルーブリックの点数計算は変更しないこと。
-- 最優先は設問への忠実な応答である。設問が要求していないSFC固有要素の不足を減点しないこと。
-- 資料がある設問では、資料の正確な解釈、資料間の関係、答案の主張への活用を評価すること。資料の要約だけで終わる場合は高評価にしないこと。
-- 問題発見型では、現象の列挙ではなく、当事者・原因・構造を踏まえた問題定義を評価すること。
-- 提案型では、独創性だけでなく、実行主体、手順、制約、効果の検証方法まで設問が求める範囲で評価すること。
-- 学際的統合は、複数分野の語を並べることではなく、各視点が分析や提案の因果関係にどう寄与するかを評価すること。
-- 推定・数量化・図示が求められる場合は、前提の明示、計算や表現の一貫性、結論との接続を評価すること。
-- 独自性は奇抜さではなく、根拠のある再定義・視点・具体化として評価すること。
-- 歴史的なS/A/B/C評価はLv.4/Lv.3/Lv.2/Lv.1の質的目安としてのみ扱い、模範解答を唯一の正解にしないこと。
-検出した設問類型: ${profile.taskTypes.length > 0 ? profile.taskTypes.join(", ") : "汎用SFC小論文"}`;
+この基準は、一般化された設問類型別精密基準へ追加する薄い校風補正である。大学名だけを理由に加点・減点せず、共通ルーブリックの点数計算も変更しないこと。
+${calibrationGuidance.join("\n")}
+- 歴史的なS/A/B/C評価はLv.4/Lv.3/Lv.2/Lv.1の質的目安としてのみ扱い、SFCらしい結論を強制しないこと。`;
 }

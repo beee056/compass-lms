@@ -583,6 +583,14 @@ export async function evaluateWithRubric(
       }
     });
 
+    // この問題が課題として割り当てられていれば、提出をもって自動で完了にする
+    if (record.questionBankId) {
+      await prisma.task.updateMany({
+        where: { studentProfileId: studentId, questionBankId: record.questionBankId, completed: false },
+        data: { completed: true, progress: 100 }
+      });
+    }
+
     revalidatePath(`/students/${studentId}`);
     revalidatePath(`/portal`);
 

@@ -105,11 +105,15 @@ model Task {
   type             String         // "DOCUMENT", "TODO"
   progress         Int            @default(0) // 0-100% for documents
   isSelfCreated    Boolean        @default(false) // 生徒自身が作成したタスクかどうか
+  // 演習課題の割当元（問題バンク）。該当問題の添削提出で自動完了する
+  questionBankId   String?
+  questionBank     QuestionBank?  @relation(fields: [questionBankId], references: [id], onDelete: SetNull)
   comments         TaskComment[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @default(now()) @updatedAt
 
   @@index([studentProfileId, completed, dueDate])
+  @@index([studentProfileId, questionBankId])
   @@index([universityId])
 }
 
@@ -293,6 +297,7 @@ model QuestionBank {
   difficulty        String?  // 難易度（基礎/標準/発展など）
   modelAnswer       String?  @db.Text // 模範解答の要点・採点ポイント（メンター/採点参照用）
   practiceRecords   PracticeRecord[]
+  tasks             Task[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

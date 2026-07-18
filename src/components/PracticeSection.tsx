@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluatePracticeInstant, evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
-import { setPracticeRecordArchived } from "@/lib/actions/practice-records";
+import { adoptAnswerAsModelAnswer, assignPracticeTask, setPracticeRecordArchived } from "@/lib/actions/practice-records";
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion, getInterviewResponseMetrics, inferCharLimit } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
@@ -76,6 +76,14 @@ export default function PracticeSection({
   const [genKind, setGenKind] = useState<PracticeKind>("小論文");
   const [genUniversity, setGenUniversity] = useState("");
   const [genTheme, setGenTheme] = useState("");
+
+  // 課題割当フォーム（メンター用）
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignKind, setAssignKind] = useState<PracticeKind>("小論文");
+  const [assignQuestionId, setAssignQuestionId] = useState("");
+  const [assignDueDate, setAssignDueDate] = useState("");
+  const [isAssigning, startAssigning] = useTransition();
+  const [adoptingId, setAdoptingId] = useState<string | null>(null);
 
   const router = useRouter();
   const [archivingId, setArchivingId] = useState<string | null>(null);
@@ -219,6 +227,47 @@ export default function PracticeSection({
     setOpen(true);
   };
 
+  const assignableQuestions = useMemo(() => {
+    return questionBank
+      .filter((q) => q.category === assignKind)
+      .sort((a, b) => {
+        const fieldA = getDisplayFieldCategory(a.fieldCategory, a.university) ?? "";
+        const fieldB = getDisplayFieldCategory(b.fieldCategory, b.university) ?? "";
+        return fieldA.localeCompare(fieldB, "ja") || String(a.title).localeCompare(String(b.title), "ja");
+      });
+  }, [questionBank, assignKind]);
+
+  const handleAssign = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignQuestionId) return;
+    startAssigning(async () => {
+      const result = await assignPracticeTask(studentId, assignQuestionId, assignDueDate || undefined);
+      if (result.success) {
+        toast.success("課題を割り当てました（タスクに追加。提出で自動完了します）");
+        setAssignOpen(false);
+        setAssignQuestionId("");
+        setAssignDueDate("");
+        router.refresh();
+      } else {
+        toast.error(result.error ?? "課題の割当に失敗しました");
+      }
+    });
+  };
+
+  const handleAdoptAnswer = (record: any) => {
+    if (!window.confirm("この解答をこの問題の参考答案として採用しますか？（生徒名は含まれません）")) return;
+    setAdoptingId(record.id);
+    startTransition(async () => {
+      const result = await adoptAnswerAsModelAnswer(record.id);
+      setAdoptingId(null);
+      if (result.success) {
+        toast.success("参考答案として登録しました（AI採点の参照にも使われます）");
+      } else {
+        toast.error(result.error ?? "登録に失敗しました");
+      }
+    });
+  };
+
   const handleArchiveRecord = (record: any) => {
     if (!window.confirm("この記録を非表示にしますか？（データは削除されません）")) return;
     setArchivingId(record.id);
@@ -352,13 +401,22 @@ export default function PracticeSection({
         </h2>
         <div className="flex items-center gap-2">
           {isMentorView && (
-            <button
-              onClick={() => setGenOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-colors shadow-sm"
-            >
-              <Wand2 className="h-4 w-4" />
-              AIで問題を生成
-            </button>
+            <>
+              <button
+                onClick={() => setAssignOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-colors shadow-sm"
+              >
+                <BookOpen className="h-4 w-4" />
+                課題を割当
+              </button>
+              <button
+                onClick={() => setGenOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-colors shadow-sm"
+              >
+                <Wand2 className="h-4 w-4" />
+                AIで問題を生成
+              </button>
+            </>
           )}
           <button
             onClick={() => setOpen(true)}
@@ -719,6 +777,76 @@ export default function PracticeSection({
         </DialogContent>
       </Dialog>
 
+      {/* ===== 課題割当ダイアログ（メンター専用） ===== */}
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent className="sm:max-w-[520px] bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-emerald-500" />
+              演習課題を割り当てる
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm">
+              問題バンクから選んだ問題をこの生徒のタスクに追加します。生徒がその問題で添削を提出すると自動で完了になります。
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAssign} className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label className="text-slate-700 font-semibold text-sm">種類</Label>
+              <select
+                value={assignKind}
+                onChange={(e) => { setAssignKind(e.target.value as PracticeKind); setAssignQuestionId(""); }}
+                className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+              >
+                {KIND_OPTIONS.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-slate-700 font-semibold text-sm">問題（「{assignKind}」{assignableQuestions.length}問）</Label>
+              <select
+                value={assignQuestionId}
+                onChange={(e) => setAssignQuestionId(e.target.value)}
+                required
+                className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+              >
+                <option value="">問題を選んでください</option>
+                {assignableQuestions.map((q: any) => {
+                  const fieldCategory = getDisplayFieldCategory(q.fieldCategory, q.university);
+                  return (
+                    <option key={q.id} value={q.id}>
+                      {fieldCategory ? `【${fieldCategory}】` : ""}{q.title}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-slate-700 font-semibold text-sm">期限（任意）</Label>
+              <Input
+                type="date"
+                value={assignDueDate}
+                onChange={(e) => setAssignDueDate(e.target.value)}
+                className="border-slate-200 h-11"
+              />
+            </div>
+            <DialogFooter className="mt-2 pt-4 border-t border-slate-100">
+              <Button type="button" variant="outline" onClick={() => setAssignOpen(false)} className="border-slate-200 text-slate-600 font-semibold">
+                キャンセル
+              </Button>
+              <Button type="submit" disabled={isAssigning || !assignQuestionId} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-w-[130px]">
+                {isAssigning ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    割当中...
+                  </>
+                ) : "課題として割当"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* ===== 問題生成ダイアログ（メンター専用） ===== */}
       <Dialog open={genOpen} onOpenChange={setGenOpen}>
         <DialogContent className="sm:max-w-[520px] bg-white">
@@ -881,6 +1009,17 @@ export default function PracticeSection({
                     {archivingId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                     記録を非表示にする
                   </button>
+                  {isMentorView && record.questionBankId && !record.parentRecordId && (
+                    <button
+                      type="button"
+                      disabled={adoptingId === record.id}
+                      onClick={() => handleAdoptAnswer(record)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      {adoptingId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      この解答を参考答案に採用
+                    </button>
+                  )}
                 </div>
 
                 {isV2 ? (

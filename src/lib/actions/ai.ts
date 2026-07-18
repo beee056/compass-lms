@@ -458,7 +458,7 @@ export async function evaluateWithRubric(
   type: string,
   promptText: string,
   answer: string,
-  options?: RubricEvaluationOptions
+  options?: RubricEvaluationOptions & { questionTitle?: string }
 ) {
   try {
     // 生徒は自分自身、メンターは自テナントの生徒のみ添削可能
@@ -475,6 +475,22 @@ export async function evaluateWithRubric(
       options
     );
 
+    // カスタム設問は問題バンクへ自動追加（生徒はPENDING・講師はACTIVE）。失敗しても添削は成立させる
+    let savedQuestion: { id: string; status: string; created: boolean } | null = null;
+    if (!options?.questionId) {
+      try {
+        savedQuestion = await autoSaveCustomQuestion(
+          user,
+          resolveKind(type),
+          authoritativePromptText,
+          options?.universityName,
+          options?.questionTitle
+        );
+      } catch (saveError) {
+        console.error("Question bank auto-save failed:", saveError);
+      }
+    }
+
     const record = await prisma.practiceRecord.create({
       data: {
         id: `prac-${randomUUID()}`,
@@ -483,37 +499,48 @@ export async function evaluateWithRubric(
         prompt: authoritativePromptText,
         answer,
         score: totalScore,
-        feedback: JSON.stringify(feedbackPayload)
+        feedback: JSON.stringify(feedbackPayload),
+        // 記録をバンク問題に紐づける（スコア推移・再提出のグルーピング用）
+        questionBankId: options?.questionId ?? savedQuestion?.id ?? null
       }
     });
 
     revalidatePath(`/students/${studentId}`);
     revalidatePath(`/portal`);
 
-    return { success: true, recordId: record.id, score: totalScore, feedback: feedbackPayload };
+    return {
+      success: true,
+      recordId: record.id,
+      score: totalScore,
+      feedback: feedbackPayload,
+      savedQuestion: savedQuestion?.created ? { id: savedQuestion.id, status: savedQuestion.status } : null
+    };
   } catch (error: any) {
     console.error("AI Evaluation failed:", error);
     return { success: false, error: toClientError(error, "添削の実行に失敗しました。時間をおいて再度お試しください") };
   }
 }
 
-// 「自分で設問を入力する」で作った設問を問題バンクへ保存する（メンター専用）。
-// 同一テナント・同一設問文は重複追加しない。
-async function saveCustomQuestionToBank(
+// 「自分で設問を入力する」で作った設問を問題バンクへ自動追加する。
+// 講師の設問は即公開(ACTIVE)、生徒の設問は承認待ち(PENDING)として保存し、
+// 管理画面で講師が承認するまで他の生徒には表示されない。
+// 同一設問文（共通問題・テナント内）は重複追加しない。
+async function autoSaveCustomQuestion(
   user: Awaited<ReturnType<typeof getCurrentUser>>,
   kind: PracticeKind,
   promptText: string,
   universityName?: string,
   title?: string
-): Promise<string> {
-  assertMentor(user);
+): Promise<{ id: string; status: string; created: boolean } | null> {
   const prompt = promptText.trim();
+  if (!prompt) return null;
   const existing = await prisma.questionBank.findFirst({
-    where: { tenantId: user.tenantId, prompt },
-    select: { id: true }
+    where: { prompt, OR: [{ tenantId: null }, { tenantId: user.tenantId }] },
+    select: { id: true, status: true }
   });
-  if (existing) return existing.id;
+  if (existing) return { id: existing.id, status: existing.status, created: false };
 
+  const status = user.role === "STUDENT" ? "PENDING" : "ACTIVE";
   const fallbackTitle = prompt.replace(/\s+/g, " ").slice(0, 30);
   const created = await prisma.questionBank.create({
     data: {
@@ -522,15 +549,17 @@ async function saveCustomQuestionToBank(
       title: (title?.trim() || fallbackTitle).slice(0, 60),
       prompt,
       source: "CUSTOM",
+      status,
+      createdByUserId: user.id,
       university: universityName?.trim() || null,
       modelAnswer: null
     }
   });
-  return created.id;
+  return { id: created.id, status, created: true };
 }
 
 // 保存なしのインスタント添削（教材ライブラリ・メンターのテスト実行用）。演習記録には残らない。
-// saveQuestionToBank指定時（メンターのみ）は、設問だけを問題バンクへ保存する。
+// カスタム設問（questionIdなし）は問題バンクへ自動追加する（生徒PENDING・講師ACTIVE）。
 export async function evaluatePracticeInstant(params: {
   type: string;
   promptText: string;
@@ -538,7 +567,6 @@ export async function evaluatePracticeInstant(params: {
   questionId?: string;
   universityName?: string;
   charLimit?: number;
-  saveQuestionToBank?: boolean;
   questionTitle?: string;
 }) {
   try {
@@ -558,11 +586,10 @@ export async function evaluatePracticeInstant(params: {
       }
     );
 
-    let savedQuestionId: string | null = null;
-    let bankSaveError: string | null = null;
-    if (params.saveQuestionToBank && !params.questionId) {
+    let savedQuestion: { id: string; status: string; created: boolean } | null = null;
+    if (!params.questionId) {
       try {
-        savedQuestionId = await saveCustomQuestionToBank(
+        savedQuestion = await autoSaveCustomQuestion(
           user,
           resolveKind(params.type),
           authoritativePromptText,
@@ -570,12 +597,16 @@ export async function evaluatePracticeInstant(params: {
           params.questionTitle
         );
       } catch (saveError) {
-        console.error("Question bank save failed:", saveError);
-        bankSaveError = toClientError(saveError, "問題バンクへの保存に失敗しました");
+        console.error("Question bank auto-save failed:", saveError);
       }
     }
 
-    return { success: true, score: totalScore, feedback: feedbackPayload, savedQuestionId, bankSaveError };
+    return {
+      success: true,
+      score: totalScore,
+      feedback: feedbackPayload,
+      savedQuestion: savedQuestion?.created ? { id: savedQuestion.id, status: savedQuestion.status } : null
+    };
   } catch (error: any) {
     console.error("Instant AI Evaluation failed:", error);
     return { success: false, error: toClientError(error, "添削の実行に失敗しました。時間をおいて再度お試しください") };

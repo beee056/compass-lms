@@ -62,8 +62,7 @@ export default function PracticeSection({
   const [fieldFilter, setFieldFilter] = useState("");
   // 添削完了後、ダイアログを閉じずにその場で結果を表示する（スクロール位置を動かさない）
   const [dialogResult, setDialogResult] = useState<{ score: number; feedback: any } | null>(null);
-  // メンターがカスタム設問を問題バンクへ保存するオプション
-  const [saveToBank, setSaveToBank] = useState(false);
+  // カスタム設問の問題バンク自動追加時に使うタイトル（任意）
   const [bankTitle, setBankTitle] = useState("");
 
   // 問題生成フォーム（メンター用）
@@ -158,7 +157,6 @@ export default function PracticeSection({
     setSelectedQuestionId("");
     setDialogResult(null);
     setError(null);
-    setSaveToBank(false);
     setBankTitle("");
   };
 
@@ -204,30 +202,26 @@ export default function PracticeSection({
       const commonOptions = {
         universityName: universityName.trim() || undefined,
         charLimit: kind !== "面接" && charLimit ? parseInt(charLimit, 10) || undefined : undefined,
-        questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined
+        questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined,
+        questionTitle: bankTitle.trim() || undefined
       };
       // メンターのテスト実行は生徒の演習記録に残さない（インスタント添削）
       const result = isMentorView
-        ? await evaluatePracticeInstant({
-            type: kind,
-            promptText,
-            answer,
-            ...commonOptions,
-            saveQuestionToBank: inputMode === "custom" && saveToBank,
-            questionTitle: bankTitle.trim() || undefined
-          })
+        ? await evaluatePracticeInstant({ type: kind, promptText, answer, ...commonOptions })
         : await evaluateWithRubric(studentId, kind, promptText, answer, commonOptions);
       if (result.success && (result as any).feedback) {
         toast.success(isMentorView ? "テスト添削が完了しました（記録には残りません）" : "AI添削が完了しました");
-        if ((result as any).savedQuestionId) {
-          toast.success("設問を問題バンクに追加しました");
-        }
-        if ((result as any).bankSaveError) {
-          toast.error((result as any).bankSaveError);
+        const savedQuestion = (result as any).savedQuestion;
+        if (savedQuestion) {
+          toast.success(
+            savedQuestion.status === "PENDING"
+              ? "設問を問題バンクへ提案しました（講師の承認後に公開されます）"
+              : "設問を問題バンクに追加しました"
+          );
         }
         // ダイアログは閉じず、その場で結果を表示する。記録一覧は裏で最新化する
         setDialogResult({ score: (result as any).score, feedback: (result as any).feedback });
-        if (!isMentorView || (result as any).savedQuestionId) {
+        if (!isMentorView || savedQuestion) {
           router.refresh();
         }
       } else {
@@ -543,26 +537,19 @@ export default function PracticeSection({
                     required
                     className="border-slate-200 min-h-[100px]"
                   />
-                  {isMentorView && inputMode === "custom" && (
+                  {inputMode === "custom" && (
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
-                      <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={saveToBank}
-                          onChange={(e) => setSaveToBank(e.target.checked)}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                        この設問を問題バンクにも追加する（テナント内で共有）
-                      </label>
-                      {saveToBank && (
-                        <Input
-                          value={bankTitle}
-                          onChange={(e) => setBankTitle(e.target.value)}
-                          placeholder="問題タイトル（未入力なら設問の冒頭から自動生成）"
-                          maxLength={60}
-                          className="mt-2 h-10 border-indigo-200 bg-white"
-                        />
-                      )}
+                      <p className="text-xs font-semibold leading-5 text-slate-600">
+                        この設問は添削実行時に問題バンクへ自動追加されます
+                        {isMentorView ? "。" : "（講師の承認後に他の生徒にも公開されます）。"}
+                      </p>
+                      <Input
+                        value={bankTitle}
+                        onChange={(e) => setBankTitle(e.target.value)}
+                        placeholder="問題タイトル（任意。未入力なら設問の冒頭から自動生成）"
+                        maxLength={60}
+                        className="mt-2 h-10 border-indigo-200 bg-white"
+                      />
                     </div>
                   )}
                 </div>

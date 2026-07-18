@@ -55,8 +55,12 @@ export default function AddStudentDialog({ className }: { className?: string }) 
               <Input id="name" name="name" placeholder="例: 山田 太郎" required className="border-slate-200" />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="university" className="text-slate-700 font-semibold text-sm">第一志望校</Label>
-              <Input id="university" name="university" placeholder="例: 慶應義塾大学 総合政策学部" required className="border-slate-200" />
+              <Label htmlFor="university" className="text-slate-700 font-semibold text-sm">第一志望校（大学名）</Label>
+              <Input id="university" name="university" placeholder="例: 慶應義塾大学" required className="border-slate-200" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="universityDepartment" className="text-slate-700 font-semibold text-sm">学部・学科 (任意)</Label>
+              <Input id="universityDepartment" name="universityDepartment" placeholder="例: 総合政策学部" className="border-slate-200" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="highSchool" className="text-slate-700 font-semibold text-sm">出身高校 (任意)</Label>

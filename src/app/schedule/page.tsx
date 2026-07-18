@@ -1,10 +1,17 @@
 import { CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getScheduleData } from "@/lib/actions";
+import { getCurrentUser, getScheduleData } from "@/lib/actions";
 import ScheduleCalendar from "@/components/ScheduleCalendar";
 
 export default async function SchedulePage() {
+  // 全生徒を俯瞰するメンター専用ページ。生徒は自分のカレンダーへ
+  const user = await getCurrentUser();
+  if (user.role === "STUDENT") {
+    redirect("/portal/calendar");
+  }
+
   const { milestones, tasks } = await getScheduleData();
 
   return (

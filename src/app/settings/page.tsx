@@ -3,10 +3,17 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-import { getTenant, getTemplates } from "@/lib/actions";
+import { redirect } from "next/navigation";
+import { getCurrentUser, getTenant, getTemplates } from "@/lib/actions";
 import SettingsTabs from "./SettingsTabs";
 
 export default async function SettingsPage() {
+  // 組織設定はメンター専用
+  const user = await getCurrentUser();
+  if (user.role === "STUDENT") {
+    redirect("/portal");
+  }
+
   const tenant = await getTenant();
   const templates = await getTemplates();
 

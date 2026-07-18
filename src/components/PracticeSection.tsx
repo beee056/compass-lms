@@ -18,6 +18,7 @@ import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 import { stripModelAnswerMetadata } from "@/lib/grading-context";
 import { getDisplayFieldCategory, resolveFieldCategory } from "@/lib/field-category";
 import PracticeFeedbackView from "@/components/PracticeFeedbackView";
+import PracticeScoreTrend from "@/components/PracticeScoreTrend";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
 
@@ -933,6 +934,13 @@ export default function PracticeSection({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ===== 得点推移（種別ごと。深掘りターンは含めない） ===== */}
+      {records.some((record: any) => !record.parentRecordId && typeof record.score === "number") && (
+        <div className="mb-5">
+          <PracticeScoreTrend records={records.filter((record: any) => !record.parentRecordId)} />
+        </div>
+      )}
 
       {/* ===== 演習記録 ===== */}
       <div className="grid gap-4">

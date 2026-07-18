@@ -382,7 +382,12 @@ export default function MentorCommandCenter({
           </div>
           <div className="divide-y divide-[#eef1ea]">
             {upcomingMilestones.length === 0 ? (
-              <div className="p-5 text-sm font-semibold text-slate-500">直近のマイルストーンはありません。</div>
+              <div className="p-5 text-sm font-semibold leading-6 text-slate-500">
+                直近のマイルストーンはありません。
+                <span className="mt-1 block text-xs font-medium text-slate-400">
+                  出願締切・面接日などの確定日程を生徒ページの「スケジュール」に登録すると、ここに表示されます（タスク期限は左の要介入キューに出ます）。
+                </span>
+              </div>
             ) : (
               upcomingMilestones.map((milestone) => (
                 <div key={milestone.id} className="p-4">

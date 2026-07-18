@@ -100,7 +100,7 @@ export async function getCurrentUser() {
   if (user && user.role === "MENTOR" && !user.studentProfile) {
     const invitedProfile = await prisma.studentProfile.findUnique({
       where: { studentEmail: user.email },
-      select: { id: true, tenantId: true, userId: true }
+      select: { id: true, name: true, tenantId: true, userId: true }
     });
     if (invitedProfile && !invitedProfile.userId && invitedProfile.tenantId !== user.tenantId) {
       const [studentCount, userCount] = await Promise.all([
@@ -113,7 +113,7 @@ export async function getCurrentUser() {
         user = await prisma.$transaction(async (tx) => {
           await tx.user.update({
             where: { id: userId2 },
-            data: { role: "STUDENT", tenantId: invitedProfile.tenantId }
+            data: { role: "STUDENT", tenantId: invitedProfile.tenantId, name: invitedProfile.name }
           });
           await tx.studentProfile.update({
             where: { id: invitedProfile.id },
@@ -209,6 +209,17 @@ export async function getCurrentUser() {
   // ここに到達して user が null なのは想定外（上のロジックで必ず生成/取得される）。
   // 返り値の型を非nullに確定させ、呼び出し側(assertMentor等)の型エラーを防ぐ。
   if (!user) throw new Error("Unauthorized");
+
+  // 生徒アカウントの表示名はプロフィール名と常に同期する
+  // （Clerk側の氏名未設定で「メンター」等のフォールバック名が残るのを防ぐ）
+  if (user.role === "STUDENT" && user.studentProfile) {
+    const profileName = (user.studentProfile as { name?: string }).name;
+    if (profileName && user.name !== profileName) {
+      await prisma.user.update({ where: { id: user.id }, data: { name: profileName } });
+      user.name = profileName;
+    }
+  }
+
   return user;
 }
 
@@ -268,11 +279,11 @@ export async function createStudent(formData: FormData) {
     const parentEmail = validateOptionalEmail(formData.get("parentEmail") as string, "保護者メールアドレス");
     const studentEmail = validateOptionalEmail(formData.get("studentEmail") as string, "生徒メールアドレス");
 
-    // 大学名をパース (例: "慶應義塾大学 総合政策学部")
+    // 学部は専用欄を優先。旧形式「大学名 学部」のスペース区切り入力もフォールバックで解釈する
+    const departmentInput = ((formData.get("universityDepartment") as string) || "").trim();
     const parts = universityStr.split(" ");
-    const uniName = parts[0];
-    const uniDept = parts.slice(1).join(" "); // "学部未定"という文字列を強制せず、空文字（または入力のまま）にする
-    const actualDept = uniDept || "学部未定";
+    const uniName = departmentInput ? universityStr.trim() : parts[0];
+    const actualDept = departmentInput || parts.slice(1).join(" ") || "学部未定";
 
     const studentId = generateId('student');
     const universityId = generateId('univ');

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
-import { Compass, GraduationCap, ListChecks, PenTool, TrendingUp } from "lucide-react";
+import { Compass, GraduationCap, ListChecks, PenTool } from "lucide-react";
+import PracticeScoreTrend from "@/components/PracticeScoreTrend";
 
 // 保護者向けの閲覧専用ページ（ログイン不要・推測不能トークンで認可）。
 // 表示するのは進捗サマリーのみ。連絡先・書類・答案本文・添削本文は含めない。
@@ -62,20 +63,7 @@ export default async function SharedProgressPage({ params }: { params: { token: 
     return singleLine.length > 45 ? `${singleLine.slice(0, 45)}…` : singleLine;
   };
 
-  // 種別ごとの演習サマリー（回数・平均点・直近の推移）
-  const kinds = ["小論文", "志望理由書", "面接"] as const;
-  const practiceSummary = kinds
-    .map((kind) => {
-      const records = student.practiceRecords.filter((record) => record.type === kind && record.score !== null);
-      const scores = records.map((record) => record.score as number);
-      return {
-        kind,
-        count: records.length,
-        average: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null,
-        recent: scores.slice(-5)
-      };
-    })
-    .filter((summary) => summary.count > 0);
+  const hasScoredPractices = student.practiceRecords.some((record) => record.score !== null);
 
   const formatDate = (value: Date) =>
     new Date(value).toLocaleDateString("ja-JP", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Tokyo" });
@@ -131,29 +119,14 @@ export default async function SharedProgressPage({ params }: { params: { token: 
           )}
         </section>
 
-        {practiceSummary.length > 0 && (
+        {hasScoredPractices && (
           <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="flex items-center gap-2 text-base font-black text-slate-800">
               <PenTool className="h-5 w-5 text-blue-500" />
-              AI添削演習のスコア
+              AI添削演習のスコア推移
             </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {practiceSummary.map((summary) => (
-                <div key={summary.kind} className="rounded-md border border-slate-100 bg-slate-50/60 p-4">
-                  <p className="text-xs font-black text-slate-500">{summary.kind}</p>
-                  <p className="mt-1 text-2xl font-black text-slate-800">
-                    {summary.average}
-                    <span className="ml-1 text-xs font-bold text-slate-400">点（平均）</span>
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">演習{summary.count}回</p>
-                  {summary.recent.length > 1 && (
-                    <p className="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-700">
-                      <TrendingUp className="h-3.5 w-3.5" />
-                      直近: {summary.recent.join(" → ")}点
-                    </p>
-                  )}
-                </div>
-              ))}
+            <div className="mt-3">
+              <PracticeScoreTrend records={student.practiceRecords as any[]} />
             </div>
           </section>
         )}

@@ -190,9 +190,19 @@ model PracticeRecord {
   answer           String         // 生徒の解答
   score            Int?           // AI採点スコア
   feedback         String         // AIフィードバック
+  // 解いた問題バンクの問題（カスタム設問はnull）。スコア推移・再提出のグルーピングに使う
+  questionBankId   String?
+  questionBank     QuestionBank?  @relation(fields: [questionBankId], references: [id], onDelete: SetNull)
+  // 面接の深掘り（2ターン目以降）の親記録
+  parentRecordId   String?
+  parentRecord     PracticeRecord? @relation("PracticeFollowUp", fields: [parentRecordId], references: [id], onDelete: SetNull)
+  followUps        PracticeRecord[] @relation("PracticeFollowUp")
+  // 生徒/講師による非表示（ソフトデリート。物理削除はしない）
+  isArchived       Boolean        @default(false)
   createdAt        DateTime       @default(now())
 
   @@index([studentProfileId])
+  @@index([studentProfileId, questionBankId])
 }
 
 model Course {
@@ -269,16 +279,23 @@ model AIFeedback {
 }
 
 model QuestionBank {
-  id          String   @id @default(cuid())
-  tenantId    String?  // null = 全テナント共通（運営提供）。値あり = そのテナント専用（AI生成問題など）
-  category    String
-  title       String
-  prompt      String   @db.Text
-  source      String   @default("MANUAL") // "MANUAL" / "AI_GENERATED" / "NOTEBOOKLM"
-  university  String?  // 過去問傾向の対象大学（AI生成時）
-  modelAnswer String?  @db.Text // 模範解答の要点・採点ポイント（メンター/採点参照用）
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String?  // null = 全テナント共通（運営提供）。値あり = そのテナント専用（AI生成問題など）
+  category          String
+  title             String
+  prompt            String   @db.Text
+  source            String   @default("MANUAL") // "MANUAL" / "AI_GENERATED" / "NOTEBOOKLM" / "CUSTOM"
+  university        String?  // 過去問傾向の対象大学（AI生成時）
+  fieldCategory     String?  // 正規化済み系統ラベル（field-category.tsの10系統）
+  status            String   @default("ACTIVE") // "ACTIVE" / "PENDING"(承認待ち) / "ARCHIVED"(非表示)
+  createdByUserId   String?  // 追加したユーザーID（生徒投稿の承認判断・監査用）
+  followUpQuestions String?  @db.Text // 面接の深掘り質問（1行1問。modelAnswerから分離）
+  difficulty        String?  // 難易度（基礎/標準/発展など）
+  modelAnswer       String?  @db.Text // 模範解答の要点・採点ポイント（メンター/採点参照用）
+  practiceRecords   PracticeRecord[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([tenantId])
+  @@index([category, status])
 }

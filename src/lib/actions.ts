@@ -7,6 +7,7 @@ import { sendEmail } from "./email";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
+  assertActiveTenant,
   assertMentor,
   assertStudentAccess,
   findAuthorizedTask,
@@ -181,11 +182,12 @@ export async function getCurrentUser() {
           });
           return newUser;
         } else {
-          // メンターとして新規テナント作成
+          // メンターとして新規テナント作成（既定は承認待ち。運営者が/adminで承認するまで利用制限）
           const tenant = await tx.tenant.create({
             data: {
               id: generateId('tenant'),
-              name: `${name}のワークスペース`
+              name: `${name}のワークスペース`,
+              status: process.env.TENANT_AUTO_APPROVE === "true" ? "ACTIVE" : "PENDING"
             }
           });
 
@@ -221,6 +223,17 @@ export async function getCurrentUser() {
   // ここに到達して user が null なのは想定外（上のロジックで必ず生成/取得される）。
   // 返り値の型を非nullに確定させ、呼び出し側(assertMentor等)の型エラーを防ぐ。
   if (!user) throw new Error("Unauthorized");
+
+  // 運営者フラグは環境変数OPERATOR_EMAILSと同期する（envが唯一の真実源。UIからの任命機能は作らない）
+  const operatorEmails = (process.env.OPERATOR_EMAILS ?? "")
+    .split(",")
+    .map((address) => address.trim().toLowerCase())
+    .filter(Boolean);
+  const shouldBeOperator = operatorEmails.includes(user.email.toLowerCase());
+  if (user.isOperator !== shouldBeOperator) {
+    await prisma.user.update({ where: { id: user.id }, data: { isOperator: shouldBeOperator } });
+    user.isOperator = shouldBeOperator;
+  }
 
   // 生徒アカウントの表示名はプロフィール名と常に同期する
   // （Clerk側の氏名未設定で「メンター」等のフォールバック名が残るのを防ぐ）
@@ -281,6 +294,7 @@ export async function createStudent(formData: FormData) {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
+    await assertActiveTenant(user);
 
     const name = validateText(formData.get("name") as string, "氏名", 100);
     const universityStr = validateText(formData.get("university") as string, "志望校", 200);

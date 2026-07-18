@@ -1,4 +1,4 @@
-import { LayoutGrid, Calendar, Settings, LogIn, BookOpen, Compass, MonitorPlay } from "lucide-react";
+import { LayoutGrid, Calendar, Settings, LogIn, BookOpen, Compass, MonitorPlay, ShieldCheck } from "lucide-react";
 import { UserButton, SignInButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
@@ -81,6 +81,11 @@ export default async function Header() {
                 <NavLink href="/settings" title="設定">
                   <Settings className="h-5 w-5" />
                 </NavLink>
+                {user?.isOperator && (
+                  <NavLink href="/admin" title="運営コンソール" baseClassName="hover:text-indigo-600 transition-colors p-1 rounded-md text-indigo-500" activeClassName="text-indigo-700 bg-indigo-50">
+                    <ShieldCheck className="h-5 w-5" />
+                  </NavLink>
+                )}
               </div>
             )}
             <UserButton />

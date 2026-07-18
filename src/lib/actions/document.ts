@@ -6,7 +6,7 @@ import prisma from "../prisma";
 import { generateText } from "ai";
 import { getAIModel } from "../ai-model";
 import { getCurrentUser } from "../actions";
-import { assertMentor, assertStudentAccess, findAuthorizedDocument, toClientError } from "../authz";
+import { assertActiveTenant, assertMentor, assertStudentAccess, findAuthorizedDocument, toClientError } from "../authz";
 import { endOfDayJST } from "../dates";
 
 const documentDraftPrompt = `
@@ -26,6 +26,7 @@ export async function generateDocumentDraft(studentId: string, type: string, uni
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
+    await assertActiveTenant(user);
 
     const student = await prisma.studentProfile.findUnique({
       where: { id: studentId }
@@ -98,6 +99,7 @@ export async function createBlankDocument(
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
+    await assertActiveTenant(user);
 
     const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
     if (!student) throw new Error("Student not found");

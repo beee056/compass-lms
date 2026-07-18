@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
-import { assertMentor, assertStudentAccess } from "../authz";
+import { assertActiveTenant, assertMentor, assertStudentAccess } from "../authz";
 import { endOfDayJST } from "../dates";
 
 export async function createStudentDocument(studentId: string, documentType: string, universityName?: string, dueDateStr?: string | null) {
@@ -11,6 +11,7 @@ export async function createStudentDocument(studentId: string, documentType: str
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
+    await assertActiveTenant(user);
 
     const adjustedDueDate = dueDateStr ? endOfDayJST(dueDateStr) : null;
 

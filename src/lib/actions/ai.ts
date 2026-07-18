@@ -6,7 +6,7 @@ import prisma from "../prisma";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { getCurrentUser } from "../actions";
-import { assertMentor, assertStudentAccess, toClientError, ValidationError } from "../authz";
+import { assertActiveTenant, assertMentor, assertStudentAccess, toClientError, ValidationError } from "../authz";
 import { getAIModel } from "../ai-model";
 import {
   RUBRICS,
@@ -494,6 +494,7 @@ export async function evaluateWithRubric(
     // 生徒は自分自身、メンターは自テナントの生徒のみ添削可能
     const user = await getCurrentUser();
     await assertStudentAccess(user, studentId);
+    await assertActiveTenant(user);
     const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
     if (!student) throw new Error("Student not found");
 
@@ -659,6 +660,7 @@ export async function evaluatePracticeInstant(params: {
 }) {
   try {
     const user = await getCurrentUser();
+    await assertActiveTenant(user);
     if (params.questionTitle && params.questionTitle.length > 60) {
       throw new ValidationError("問題タイトルは60字以内で入力してください");
     }
@@ -729,6 +731,7 @@ export async function generatePracticeQuestion(params: {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
+    await assertActiveTenant(user);
 
     const kind = resolveKind(params.kind);
     if (params.theme && params.theme.length > 200) {

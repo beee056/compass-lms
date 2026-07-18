@@ -6,6 +6,7 @@ import { getCurrentUser } from "../actions";
 import {
   AuthorizationError,
   ValidationError,
+  assertActiveTenant,
   assertMentor,
   assertStudentAccess,
   getOwnStudentProfileId,
@@ -52,6 +53,7 @@ export async function assignPracticeTask(studentId: string, questionId: string, 
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
+    await assertActiveTenant(user);
 
     const question = await prisma.questionBank.findFirst({
       where: {

@@ -8,6 +8,7 @@ import DocumentList from "@/components/DocumentList";
 import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import PracticeSection from "@/components/PracticeSection";
+import TenantStatusNotice from "@/components/TenantStatusNotice";
 
 // AI添削（このページから呼ばれるServer Action）がタイムアウトしないよう上限を延長
 export const maxDuration = 60;
@@ -27,6 +28,12 @@ export default async function StudentPortalPage() {
   // MENTORが直接 /portal にアクセスした場合は弾く（もしくは自分担当の生徒一覧にリダイレクト）
   if (user.role !== "STUDENT") {
     redirect("/");
+  }
+
+  // 所属テナントが停止中の場合は、生徒も利用できない
+  const tenantStatus = (user.tenant as { status?: string } | null)?.status;
+  if (tenantStatus === "SUSPENDED") {
+    return <TenantStatusNotice status={tenantStatus} workspaceName={user.tenant?.name} />;
   }
 
   // 紐づく生徒プロフィールを取得

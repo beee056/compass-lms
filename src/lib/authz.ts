@@ -12,6 +12,7 @@ export interface SessionUser {
   id: string;
   tenantId: string;
   role: string;
+  isOperator?: boolean;
   studentProfile?: { id: string } | null;
 }
 
@@ -43,6 +44,29 @@ export function assertMentor(user: SessionUser): void {
   if (user.role === "STUDENT") {
     throw new AuthorizationError();
   }
+}
+
+// 運営者（プラットフォーム管理者）であることを要求する。/admin配下の専用アクションのみで使用
+export function assertOperator(user: SessionUser): void {
+  if (!user.isOperator) {
+    throw new AuthorizationError();
+  }
+}
+
+// テナントが利用可能（ACTIVE）であることを要求する。
+// コスト発生・データ増加を伴うアクション（AI添削・生徒/書類作成等）で使用する。
+export async function assertActiveTenant(user: SessionUser): Promise<void> {
+  if (user.isOperator) return;
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: user.tenantId },
+    select: { status: true }
+  });
+  if (tenant?.status === "ACTIVE") return;
+  throw new AuthorizationError(
+    tenant?.status === "PENDING"
+      ? "ワークスペースは承認待ちです。運営者の承認後に利用できます"
+      : "このワークスペースは現在利用を停止されています。運営者へお問い合わせください"
+  );
 }
 
 // 生徒本人の studentProfile.id を取得する

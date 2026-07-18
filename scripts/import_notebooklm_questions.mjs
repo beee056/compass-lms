@@ -52,13 +52,29 @@ function questionId(externalId) {
   return `notebooklm_${externalId.toLowerCase()}`;
 }
 
+const ALLOWED_FIELD_CATEGORIES = new Set([
+  "医療・保健系",
+  "教育・保育系",
+  "心理系",
+  "文・人文系",
+  "国際・社会・地域系",
+  "経済・経営系",
+  "法・政治・政策系",
+  "芸術・デザイン系",
+  "理工・自然科学系",
+  "スポーツ系",
+  "共通・汎用"
+]);
+
 function normalizeQuestions(rows) {
   const [headers, ...dataRows] = rows;
   const expectedHeaders = [
     "QuestionId",
     "Category",
+    "FieldCategory",
     "Title",
     "Prompt",
+    "FollowUpQuestions",
     "ModelAnswer",
     "University",
     "Difficulty",
@@ -88,8 +104,19 @@ function normalizeQuestions(rows) {
       );
     }
 
-    const [externalId, category, title, prompt, modelAnswer, university, difficulty, reference, sourceName] =
-      values;
+    const [
+      externalId,
+      category,
+      fieldCategory,
+      title,
+      prompt,
+      followUpQuestions,
+      modelAnswer,
+      university,
+      difficulty,
+      reference,
+      sourceName
+    ] = values;
 
     if (!/^NLM-\d{3}$/.test(externalId)) {
       throw new Error(`CSV ${rowNumber}行目: QuestionId「${externalId}」が不正です。`);
@@ -97,8 +124,14 @@ function normalizeQuestions(rows) {
     if (!ALLOWED_CATEGORIES.has(category)) {
       throw new Error(`CSV ${rowNumber}行目: 未対応カテゴリ「${category}」です。`);
     }
+    if (!ALLOWED_FIELD_CATEGORIES.has(fieldCategory?.trim())) {
+      throw new Error(`CSV ${rowNumber}行目: 未対応の系統「${fieldCategory}」です。`);
+    }
     if (!title?.trim() || !prompt?.trim()) {
       throw new Error(`CSV ${rowNumber}行目: TitleまたはPromptが空です。`);
+    }
+    if (category !== "面接" && followUpQuestions?.trim()) {
+      throw new Error(`CSV ${rowNumber}行目: FollowUpQuestionsは面接のみ使用できます。`);
     }
     if (
       !modelAnswer?.trim() ||
@@ -111,22 +144,27 @@ function normalizeQuestions(rows) {
       );
     }
 
-    const answerNotes = [
-      modelAnswer?.trim(),
-      difficulty?.trim() ? `【難易度】${difficulty.trim()}` : null,
-      reference?.trim() ? `【NotebookLM参照】${reference.trim()}` : null,
-      sourceName?.trim() ? `【出典】${sourceName.trim()}` : null
-    ].filter(Boolean);
+    // 深掘りは「 | 」区切り → DBでは1行1問で保存
+    const followUps = (followUpQuestions ?? "")
+      .split("|")
+      .map((question) => question.trim())
+      .filter(Boolean)
+      .join("\n");
 
     return {
       id: questionId(externalId),
       tenantId: null,
       category,
+      fieldCategory: fieldCategory.trim(),
       title: title.trim(),
       prompt: prompt.trim(),
+      followUpQuestions: followUps || null,
       source: "NOTEBOOKLM",
+      status: "ACTIVE",
       university: university?.trim() || null,
-      modelAnswer: answerNotes.join("\n\n") || null
+      difficulty: difficulty.trim(),
+      // 難易度・参照・出典はUIに出さないためmodelAnswer本文へは連結しない
+      modelAnswer: modelAnswer.trim() || null
     };
   });
 }

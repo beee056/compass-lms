@@ -37,9 +37,9 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     prisma.questionBank.findMany({
       // 共通問題(tenantId=null) + 自テナントのAI生成問題
       // 設問全文・模範解答は選択時にAPIで取得するため、一覧用の項目だけを渡す
-      where: { OR: [{ tenantId: null }, { tenantId: user.tenantId }] },
+      where: { status: "ACTIVE", OR: [{ tenantId: null }, { tenantId: user.tenantId }] },
       orderBy: { createdAt: "desc" },
-      select: { id: true, category: true, title: true, university: true }
+      select: { id: true, category: true, title: true, university: true, fieldCategory: true }
     }),
     prisma.studentProfile.findFirst({
       where: { id: params.id, tenantId: user.tenantId },

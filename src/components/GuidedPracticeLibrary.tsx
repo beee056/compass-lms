@@ -16,7 +16,7 @@ import {
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion } from "@/lib/practice-evaluation";
 import { stripModelAnswerMetadata } from "@/lib/grading-context";
-import { getFieldCategory } from "@/lib/field-category";
+import { getDisplayFieldCategory, resolveFieldCategory } from "@/lib/field-category";
 import { evaluatePracticeInstant } from "@/lib/actions/ai";
 import PracticeFeedbackView from "@/components/PracticeFeedbackView";
 
@@ -49,6 +49,7 @@ interface PracticeQuestion {
   category: string;
   title: string;
   university: string | null;
+  fieldCategory?: string | null;
 }
 
 interface PracticeQuestionDetail {
@@ -84,11 +85,11 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
     }, { 志望理由書: 0, 小論文: 0, 面接: 0 });
   }, [questions]);
 
-  // 選択中の演習種類に存在する系統ラベル（university欄を正規化した大くくり）の一覧
+  // 選択中の演習種類に存在する系統ラベル（DB値優先・なければuniversity欄から推定）の一覧
   const fieldOptions = useMemo(() => {
     const values = questions
       .filter((question) => question.category === activeKind)
-      .map((question) => getFieldCategory(question.university))
+      .map((question) => resolveFieldCategory(question.fieldCategory, question.university))
       .filter((category): category is string => Boolean(category));
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, "ja"));
   }, [activeKind, questions]);
@@ -97,12 +98,12 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
     const normalizedQuery = query.trim().toLowerCase();
     return questions.filter((question) => {
       if (question.category !== activeKind) return false;
-      if (fieldFilter && getFieldCategory(question.university) !== fieldFilter) return false;
+      if (fieldFilter && resolveFieldCategory(question.fieldCategory, question.university) !== fieldFilter) return false;
       if (!normalizedQuery) return true;
       const haystack = [
         question.title,
         question.university ?? "",
-        getFieldCategory(question.university) ?? ""
+        resolveFieldCategory(question.fieldCategory, question.university) ?? ""
       ].join(" ").toLowerCase();
       return haystack.includes(normalizedQuery);
     });
@@ -377,10 +378,10 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                         aria-expanded={isOpen}
                       >
                         <span className="min-w-0">
-                          {getFieldCategory(question.university) && (
+                          {getDisplayFieldCategory(question.fieldCategory, question.university) && (
                             <span className="flex flex-wrap items-center gap-2">
                               <span className="rounded-sm bg-[#eef1ff] px-2 py-0.5 text-[11px] font-black text-[#3346a3]">
-                                {getFieldCategory(question.university)}
+                                {getDisplayFieldCategory(question.fieldCategory, question.university)}
                               </span>
                             </span>
                           )}

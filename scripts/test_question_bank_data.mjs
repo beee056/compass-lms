@@ -53,11 +53,52 @@ function parseCsv(text) {
   return rows;
 }
 
+const ALLOWED_FIELD_CATEGORIES = new Set([
+  "医療・保健系",
+  "教育・保育系",
+  "心理系",
+  "文・人文系",
+  "国際・社会・地域系",
+  "経済・経営系",
+  "法・政治・政策系",
+  "芸術・デザイン系",
+  "理工・自然科学系",
+  "スポーツ系",
+  "共通・汎用"
+]);
+
 const csv = await readFile(CSV_PATH, "utf8");
 const [, ...rows] = parseCsv(csv);
-const questions = rows.map(([id, category, title, prompt]) => ({ id, category, title, prompt }));
+const questions = rows.map(([id, category, fieldCategory, title, prompt, followUpQuestions]) => ({
+  id,
+  category,
+  fieldCategory,
+  title,
+  prompt,
+  followUpQuestions
+}));
 const interviewQuestions = questions.filter((question) => question.category === "面接");
 const essayQuestions = questions.filter((question) => question.category === "小論文");
+
+test("バンクの全問題に許可リスト内の系統ラベルが付いている", () => {
+  const invalid = questions
+    .filter((question) => !ALLOWED_FIELD_CATEGORIES.has(question.fieldCategory))
+    .map((question) => `${question.id}:${question.fieldCategory}`);
+
+  assert.deepEqual(invalid, []);
+});
+
+test("深掘りは面接のFollowUpQuestions列だけに存在する", () => {
+  const misplaced = questions
+    .filter((question) => question.category !== "面接" && question.followUpQuestions?.trim())
+    .map((question) => question.id);
+  const embedded = interviewQuestions
+    .filter((question) => /深掘り|基本質問|追加質問/.test(question.prompt))
+    .map((question) => question.id);
+
+  assert.deepEqual(misplaced, []);
+  assert.deepEqual(embedded, []);
+});
 
 test("バンクの面接問題はすべて一問一答チェックを通過する", () => {
   const rejected = interviewQuestions

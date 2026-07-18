@@ -26,12 +26,13 @@ export default async function MaterialsPage() {
     }),
     prisma.questionBank.findMany({
       where: {
+        status: "ACTIVE",
         OR: [
           { tenantId: null },
           { tenantId: user.tenantId }
         ]
       },
-      take: 300,
+      take: 400,
       orderBy: [
         { category: "asc" },
         { createdAt: "desc" }
@@ -40,7 +41,8 @@ export default async function MaterialsPage() {
         id: true,
         category: true,
         title: true,
-        university: true
+        university: true,
+        fieldCategory: true
       }
     })
   ]);

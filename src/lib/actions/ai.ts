@@ -165,6 +165,7 @@ async function runRubricEvaluation(
     const referenceCandidates = (await prisma.questionBank.findMany({
       where: {
         category: kind,
+        status: "ACTIVE",
         OR: [{ tenantId: null }, { tenantId: user.tenantId }],
         modelAnswer: { not: null }
       },

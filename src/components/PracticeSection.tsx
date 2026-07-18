@@ -15,7 +15,7 @@ import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion, getInterviewResponseMetrics, inferCharLimit } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 import { stripModelAnswerMetadata } from "@/lib/grading-context";
-import { getFieldCategory } from "@/lib/field-category";
+import { getDisplayFieldCategory, resolveFieldCategory } from "@/lib/field-category";
 import PracticeFeedbackView from "@/components/PracticeFeedbackView";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
@@ -80,11 +80,11 @@ export default function PracticeSection({
   const selectedQuestion = questionBank.find((q) => q.id === selectedQuestionId);
   const selectedQuestionDetail = selectedQuestionId ? questionDetails[selectedQuestionId] : undefined;
 
-  // 選択中の演習種類に存在する系統ラベル（university欄を正規化した大くくり）の一覧
+  // 選択中の演習種類に存在する系統ラベル（DB値優先・なければuniversity欄から推定）の一覧
   const fieldOptions = useMemo(() => {
     const values = questionBank
       .filter((q) => q.category === kind)
-      .map((q) => getFieldCategory(q.university))
+      .map((q) => resolveFieldCategory(q.fieldCategory, q.university))
       .filter((category): category is string => Boolean(category));
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, "ja"));
   }, [questionBank, kind]);
@@ -93,10 +93,10 @@ export default function PracticeSection({
   const bankQuestionsForKind = useMemo(() => {
     return questionBank
       .filter((q) => q.category === kind)
-      .filter((q) => !fieldFilter || getFieldCategory(q.university) === fieldFilter)
+      .filter((q) => !fieldFilter || resolveFieldCategory(q.fieldCategory, q.university) === fieldFilter)
       .sort((a, b) => {
-        const fieldA = getFieldCategory(a.university) ?? "";
-        const fieldB = getFieldCategory(b.university) ?? "";
+        const fieldA = getDisplayFieldCategory(a.fieldCategory, a.university) ?? "";
+        const fieldB = getDisplayFieldCategory(b.fieldCategory, b.university) ?? "";
         return fieldA.localeCompare(fieldB, "ja") || String(a.title).localeCompare(String(b.title), "ja");
       });
   }, [questionBank, kind, fieldFilter]);
@@ -387,7 +387,7 @@ export default function PracticeSection({
                       >
                         <option value="">練習したいテーマを選んでください</option>
                         {bankQuestionsForKind.map((q: any) => {
-                          const fieldCategory = getFieldCategory(q.university);
+                          const fieldCategory = getDisplayFieldCategory(q.fieldCategory, q.university);
                           return (
                             <option key={q.id} value={q.id}>
                               {fieldCategory ? `【${fieldCategory}】` : ""}{q.title}

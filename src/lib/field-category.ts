@@ -1,6 +1,44 @@
-// 問題バンクの university 欄（「作業療法学系」「横浜市立大学等」など粒度がばらばらな値）を、
-// 生徒が参照しやすい大くくりの系統ラベルへ正規化する。
-// 大学名しか含まれない値は系統を判定できないため null（タグなし）として扱う。
+// 問題バンクの系統ラベル。
+// - DBに fieldCategory が保存されている問題はその値を正とする（CSV整備済みのNotebookLM問題）
+// - 未設定の問題（AI生成・旧データ）は university 欄から getFieldCategory で推定する
+
+// 系統ラベルの許可リスト（CSV検証・管理画面の選択肢で使用）
+export const FIELD_CATEGORIES = [
+  "医療・保健系",
+  "教育・保育系",
+  "心理系",
+  "文・人文系",
+  "国際・社会・地域系",
+  "経済・経営系",
+  "法・政治・政策系",
+  "芸術・デザイン系",
+  "理工・自然科学系",
+  "スポーツ系",
+  "共通・汎用"
+] as const;
+
+export type FieldCategory = (typeof FIELD_CATEGORIES)[number];
+
+// 系統の解決: DB値優先、なければuniversity欄から推定。
+// 「共通・汎用」もフィルタ用の値としてはそのまま返す（タグ表示側で非表示にする）。
+export function resolveFieldCategory(
+  fieldCategory: string | null | undefined,
+  university: string | null | undefined
+): string | null {
+  if (fieldCategory && (FIELD_CATEGORIES as readonly string[]).includes(fieldCategory)) {
+    return fieldCategory;
+  }
+  return getFieldCategory(university);
+}
+
+// タグ（チップ・選択肢の接頭辞）として表示すべき系統。汎用ラベルはノイズになるため表示しない
+export function getDisplayFieldCategory(
+  fieldCategory: string | null | undefined,
+  university: string | null | undefined
+): string | null {
+  const resolved = resolveFieldCategory(fieldCategory, university);
+  return resolved === "共通・汎用" ? null : resolved;
+}
 
 const FIELD_CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
   // 医療を最初に判定する（法医学・獣医などが法学系・理工系に誤分類されないように）

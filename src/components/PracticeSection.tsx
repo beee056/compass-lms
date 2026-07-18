@@ -62,7 +62,13 @@ export default function PracticeSection({
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [fieldFilter, setFieldFilter] = useState("");
   // 添削完了後、ダイアログを閉じずにその場で結果を表示する（スクロール位置を動かさない）
-  const [dialogResult, setDialogResult] = useState<{ score: number; feedback: any } | null>(null);
+  const [dialogResult, setDialogResult] = useState<{ score: number; feedback: any; recordId?: string | null } | null>(null);
+  // 面接の深掘りターン中の文脈（前の質問・回答と、保存フロー用の親記録ID）
+  const [followUpContext, setFollowUpContext] = useState<{
+    parentRecordId: string | null;
+    previousQuestion: string;
+    previousAnswer: string;
+  } | null>(null);
   // カスタム設問の問題バンク自動追加時に使うタイトル（任意）
   const [bankTitle, setBankTitle] = useState("");
 
@@ -173,6 +179,23 @@ export default function PracticeSection({
     setDialogResult(null);
     setError(null);
     setBankTitle("");
+    setFollowUpContext(null);
+  };
+
+  // 添削結果から、AIが提案した深掘り質問に続けて答えるターンを開始する
+  const startFollowUpTurn = () => {
+    const nextQuestion = dialogResult?.feedback?.nextFollowUpQuestion;
+    if (!nextQuestion) return;
+    setFollowUpContext({
+      parentRecordId: dialogResult?.recordId ?? null,
+      previousQuestion: promptText,
+      previousAnswer: answer
+    });
+    setPromptText(nextQuestion);
+    setAnswer("");
+    setSelectedQuestionId("");
+    setDialogResult(null);
+    setError(null);
   };
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
@@ -245,16 +268,28 @@ export default function PracticeSection({
 
     setError(null);
     startTransition(async () => {
+      const isFollowUpTurn = kind === "面接" && !!followUpContext;
       const commonOptions = {
         universityName: universityName.trim() || undefined,
         charLimit: kind !== "面接" && charLimit ? parseInt(charLimit, 10) || undefined : undefined,
-        questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined,
+        questionId: !isFollowUpTurn && inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined,
         questionTitle: bankTitle.trim() || undefined
       };
       // メンターのテスト実行は生徒の演習記録に残さない（インスタント添削）
       const result = isMentorView
-        ? await evaluatePracticeInstant({ type: kind, promptText, answer, ...commonOptions })
-        : await evaluateWithRubric(studentId, kind, promptText, answer, commonOptions);
+        ? await evaluatePracticeInstant({
+            type: kind,
+            promptText,
+            answer,
+            ...commonOptions,
+            previousTurn: isFollowUpTurn
+              ? { question: followUpContext!.previousQuestion, answer: followUpContext!.previousAnswer }
+              : undefined
+          })
+        : await evaluateWithRubric(studentId, kind, promptText, answer, {
+            ...commonOptions,
+            parentRecordId: isFollowUpTurn ? followUpContext!.parentRecordId ?? undefined : undefined
+          });
       if (result.success && (result as any).feedback) {
         toast.success(isMentorView ? "テスト添削が完了しました（記録には残りません）" : "AI添削が完了しました");
         const savedQuestion = (result as any).savedQuestion;
@@ -266,7 +301,11 @@ export default function PracticeSection({
           );
         }
         // ダイアログは閉じず、その場で結果を表示する。記録一覧は裏で最新化する
-        setDialogResult({ score: (result as any).score, feedback: (result as any).feedback });
+        setDialogResult({
+          score: (result as any).score,
+          feedback: (result as any).feedback,
+          recordId: (result as any).recordId ?? null
+        });
         if (!isMentorView || savedQuestion) {
           router.refresh();
         }
@@ -360,6 +399,23 @@ export default function PracticeSection({
                 </span>
               </div>
               <PracticeFeedbackView feedback={dialogResult.feedback} />
+              {kind === "面接" && dialogResult.feedback?.nextFollowUpQuestion && (
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-600">面接官からの深掘り</p>
+                    <p className="mt-1 text-sm font-bold leading-6 text-slate-800">
+                      「{dialogResult.feedback.nextFollowUpQuestion}」
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={startFollowUpTurn}
+                    className="bg-amber-600 font-bold text-white hover:bg-amber-700"
+                  >
+                    続けて答える
+                  </Button>
+                </div>
+              )}
               <DialogFooter className="mt-6 pt-4 border-t border-slate-100">
                 <Button
                   type="button"
@@ -388,7 +444,24 @@ export default function PracticeSection({
             )}
 
             <div className="grid gap-5 py-2">
+              {/* 深掘りターン中の文脈表示 */}
+              {followUpContext && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-600">面接の深掘りターン</p>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs font-bold text-slate-500">
+                      前の質問と回答を確認する
+                    </summary>
+                    <div className="mt-2 space-y-2 text-sm text-slate-700">
+                      <p className="whitespace-pre-wrap rounded-md bg-white p-3 font-medium leading-6">Q: {followUpContext.previousQuestion}</p>
+                      <p className="whitespace-pre-wrap rounded-md bg-white p-3 font-medium leading-6">A: {followUpContext.previousAnswer}</p>
+                    </div>
+                  </details>
+                </div>
+              )}
+
               {/* モード切替 */}
+              {!followUpContext && (
               <div className="flex p-1 bg-slate-100 rounded-lg">
                 <button
                   type="button"
@@ -411,8 +484,9 @@ export default function PracticeSection({
                   自分で設問を入力する
                 </button>
               </div>
+              )}
 
-              {inputMode === "bank" && (
+              {inputMode === "bank" && !followUpContext && (
                 <div className="grid gap-3">
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
                     <div className="grid gap-2">
@@ -509,6 +583,7 @@ export default function PracticeSection({
                 </div>
               )}
 
+              {!followUpContext && (
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="grid gap-2">
                   <Label className="text-slate-700 font-semibold text-sm">演習の種類</Label>
@@ -544,6 +619,7 @@ export default function PracticeSection({
                   </div>
                 )}
               </div>
+              )}
 
               {/* 選択中の種別のルーブリック説明 */}
               <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
@@ -569,7 +645,7 @@ export default function PracticeSection({
               {!(inputMode === "bank" && selectedQuestionId) && (
                 <div className="grid gap-2">
                   <Label htmlFor="promptText" className="text-slate-700 font-semibold text-sm">
-                    {kind === "面接" ? "面接の主質問（1問）" : "設問（テーマ）"}
+                    {followUpContext ? "深掘り質問（1問）" : kind === "面接" ? "面接の主質問（1問）" : "設問（テーマ）"}
                   </Label>
                   <Textarea
                     id="promptText"
@@ -583,7 +659,7 @@ export default function PracticeSection({
                     required
                     className="border-slate-200 min-h-[100px]"
                   />
-                  {inputMode === "custom" && (
+                  {inputMode === "custom" && !followUpContext && (
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
                       <p className="text-xs font-semibold leading-5 text-slate-600">
                         この設問は添削実行時に問題バンクへ自動追加されます
@@ -738,6 +814,11 @@ export default function PracticeSection({
                       {isV2 && feedback.universityProfile?.label && (
                         <span className="text-xs py-0.5 px-2 bg-violet-100 text-violet-700 font-bold rounded-sm">
                           {feedback.universityProfile.label}
+                        </span>
+                      )}
+                      {record.parentRecordId && (
+                        <span className="text-xs py-0.5 px-2 bg-amber-50 text-amber-700 font-bold rounded-sm border border-amber-200">
+                          深掘り
                         </span>
                       )}
                       {attemptNumber > 0 && attempts.length > 1 && (

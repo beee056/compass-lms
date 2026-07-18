@@ -84,6 +84,12 @@ interface RubricEvaluationOptions {
   universityName?: string;
   charLimit?: number;
   questionId?: string;
+  // 面接の深掘りターン: 直前のやり取り（文脈として採点に渡す）
+  previousTurn?: { question: string; answer: string };
+  // すでに尋ねた深掘り質問（次の深掘り候補から除外する）
+  usedFollowUps?: string[];
+  // 深掘りターンで使う、元のバンク問題の深掘り候補（1要素1問）
+  followUpCandidates?: string[];
 }
 
 // 添削の共通コア。認可と保存は呼び出し側（evaluateWithRubric / evaluatePracticeInstant）が担う。
@@ -123,7 +129,8 @@ async function runRubricEvaluation(
             title: true,
             prompt: true,
             modelAnswer: true,
-            university: true
+            university: true,
+            followUpQuestions: true
           }
         })
       : null;
@@ -208,11 +215,23 @@ async function runRubricEvaluation(
 ${lengthScoreCap !== null ? `- システム計測による字数基準上、「字数・完成度」は${lengthScoreCap}点を超えてはならない。` : ""}${effectiveCharLimit ? "" : `
 - この設問では規定字数を特定できない。「字数・完成度」は結論までの完結性だけで評価し、字数の不足や超過を理由に減点しないこと。`}`
       : "";
+    const bankFollowUpCandidates = kind === "面接"
+      ? [
+          ...(selectedQuestion?.followUpQuestions ?? "").split(/\r?\n/),
+          ...(options?.followUpCandidates ?? [])
+        ]
+          .map((question) => question.trim())
+          .filter((question) => question && !(options?.usedFollowUps ?? []).includes(question))
+      : [];
     const interviewScoringRules = kind === "面接"
       ? `【一問一答の面接採点ルール】
 - 今回の採点対象は主質問1問だけである。括弧内や参照資料の「深掘り」「追加質問」は次ターンで尋ねる候補であり、初回回答の必須要素にしないこと。
 - 主質問が明示的に求めていない「経験」「大学での応用」「結果からの学び」等がないことを減点しないこと。
-- 回答を受けて次に尋ねるべき深掘り質問はnextActionsへ1問ずつ提案し、初回回答へ先回りして全て盛り込むよう要求しないこと。`
+- 回答を受けて次に尋ねるべき深掘り質問はnextActionsへ1問ずつ提案し、初回回答へ先回りして全て盛り込むよう要求しないこと。
+- nextFollowUpQuestionには、面接官として次に尋ねる深掘り質問を1問だけ、簡潔な質問文で書くこと。${bankFollowUpCandidates.length > 0 ? `次の候補のうち今回の回答の流れに合うものを優先して選ぶこと（合うものが無ければ回答内容に基づいて作成してよい）:\n${bankFollowUpCandidates.map((question) => `  - ${question}`).join("\n")}` : "回答の弱点や掘り下げどころを突く質問にすること。"}${options?.previousTurn ? `
+【深掘りターンの採点ルール】
+- 今回の質問は、前のやり取りへの深掘りである。前の回答との一貫性と、深掘りの意図（根拠・具体化・別視点など）へ直接応えているかを「質問応答性」で評価すること。
+- 前の回答で既に述べた内容の単純な繰り返しは高く評価しないこと。` : ""}`
       : "";
     const questionDependentAxes = evaluableAxes.filter((axis) => axis.questionDependent);
     const applicabilityRules = questionDependentAxes.length > 0
@@ -298,6 +317,13 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
       improvements: z.array(z.string()).describe("改善点・課題（2〜3個。最も点数が伸びる順に）"),
       nextActions: z.array(z.string()).describe("具体的な次アクション（2〜3個。「〜を書き直す」等、今日から実行できる粒度で）"),
       overallFeedback: z.string().describe("総評（4〜6文。まず良い点、次に最重要の改善点、最後に励まし）"),
+      ...(kind === "面接"
+        ? {
+            nextFollowUpQuestion: z
+              .string()
+              .describe("この回答を受けて、面接官として次に尋ねる深掘り質問を1問（簡潔な質問文のみ。文字数指定は付けない）")
+          }
+        : {}),
       ...(kind === "小論文"
         ? {
             deductions: z
@@ -332,7 +358,7 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
       // 出力の安定性を優先（高温だと講評末尾に文字化け・重複が混入することがある）
       temperature: 0.3,
       system: systemPrompt,
-      prompt: `${effectiveUniversityName ? `<untrusted_request_metadata format="json">\n${serializeUntrustedData({ universityName: effectiveUniversityName })}\n</untrusted_request_metadata>\n\n` : ""}${gradingReferenceContext ? `<untrusted_reference_data format="json">\n${gradingReferenceContext}\n</untrusted_reference_data>\n\n` : ""}【設問/テーマ】\n${authoritativePromptText}\n\n【生徒の解答】\n${answer}`
+      prompt: `${effectiveUniversityName ? `<untrusted_request_metadata format="json">\n${serializeUntrustedData({ universityName: effectiveUniversityName })}\n</untrusted_request_metadata>\n\n` : ""}${gradingReferenceContext ? `<untrusted_reference_data format="json">\n${gradingReferenceContext}\n</untrusted_reference_data>\n\n` : ""}${options?.previousTurn ? `【前のやり取り（文脈）】\nQ: ${options.previousTurn.question}\nA: ${options.previousTurn.answer}\n\n` : ""}【設問/テーマ】\n${authoritativePromptText}\n\n【生徒の解答】\n${answer}`
     });
 
     const axisResults = evaluation.axes as Record<string, { score: number; comment: string; applicable?: boolean }>;
@@ -446,6 +472,7 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
       improvements: evaluation.improvements,
       nextActions: evaluation.nextActions,
       overallFeedback: evaluation.overallFeedback,
+      nextFollowUpQuestion: (evaluation as any).nextFollowUpQuestion ?? null,
       deductions: (evaluation as any).deductions ?? null,
       checklist: (evaluation as any).checklist ?? null
     };
@@ -453,12 +480,15 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
     return { authoritativePromptText, totalScore, feedbackPayload };
 }
 
+// 面接の深掘りチェーンの最大ターン数（主質問 + 深掘り2回）
+const MAX_INTERVIEW_TURNS = 3;
+
 export async function evaluateWithRubric(
   studentId: string,
   type: string,
   promptText: string,
   answer: string,
-  options?: RubricEvaluationOptions & { questionTitle?: string }
+  options?: RubricEvaluationOptions & { questionTitle?: string; parentRecordId?: string }
 ) {
   try {
     // 生徒は自分自身、メンターは自テナントの生徒のみ添削可能
@@ -467,17 +497,63 @@ export async function evaluateWithRubric(
     const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
     if (!student) throw new Error("Student not found");
 
+    // 面接の深掘りターン: 親記録から文脈（前のやり取り・使用済み深掘り・元のバンク問題）を復元する
+    let previousTurn: { question: string; answer: string } | undefined;
+    let usedFollowUps: string[] | undefined;
+    let followUpCandidates: string[] | undefined;
+    let rootQuestionBankId: string | null = null;
+    if (options?.parentRecordId) {
+      if (resolveKind(type) !== "面接") {
+        throw new ValidationError("深掘りターンは面接のみ利用できます");
+      }
+      const chainPrompts: string[] = [];
+      let current = await prisma.practiceRecord.findFirst({
+        where: { id: options.parentRecordId, studentProfileId: studentId }
+      });
+      if (!current) throw new ValidationError("親の面接記録が見つかりません");
+      previousTurn = { question: current.prompt, answer: current.answer };
+
+      let depth = 1;
+      let cursor = current;
+      while (cursor) {
+        chainPrompts.push(cursor.prompt);
+        rootQuestionBankId = cursor.questionBankId ?? rootQuestionBankId;
+        if (!cursor.parentRecordId) break;
+        depth += 1;
+        if (depth >= MAX_INTERVIEW_TURNS) {
+          throw new ValidationError(`深掘りは主質問を含めて${MAX_INTERVIEW_TURNS}ターンまでです。新しい主質問で練習しましょう`);
+        }
+        const parent = await prisma.practiceRecord.findFirst({
+          where: { id: cursor.parentRecordId, studentProfileId: studentId }
+        });
+        if (!parent) break;
+        cursor = parent;
+      }
+      usedFollowUps = [...chainPrompts, promptText.trim()];
+      if (rootQuestionBankId) {
+        const rootQuestion = await prisma.questionBank.findUnique({
+          where: { id: rootQuestionBankId },
+          select: { followUpQuestions: true }
+        });
+        followUpCandidates = (rootQuestion?.followUpQuestions ?? "")
+          .split(/\r?\n/)
+          .map((question) => question.trim())
+          .filter(Boolean);
+      }
+    }
+
     const { authoritativePromptText, totalScore, feedbackPayload } = await runRubricEvaluation(
       user,
       type,
       promptText,
       answer,
-      options
+      { ...options, previousTurn, usedFollowUps, followUpCandidates }
     );
 
-    // カスタム設問は問題バンクへ自動追加（生徒はPENDING・講師はACTIVE）。失敗しても添削は成立させる
+    // カスタム設問は問題バンクへ自動追加（生徒はPENDING・講師はACTIVE）。失敗しても添削は成立させる。
+    // 深掘りターンの質問は独立した問題ではないため追加しない
     let savedQuestion: { id: string; status: string; created: boolean } | null = null;
-    if (!options?.questionId) {
+    if (!options?.questionId && !options?.parentRecordId) {
       try {
         savedQuestion = await autoSaveCustomQuestion(
           user,
@@ -500,8 +576,10 @@ export async function evaluateWithRubric(
         answer,
         score: totalScore,
         feedback: JSON.stringify(feedbackPayload),
-        // 記録をバンク問題に紐づける（スコア推移・再提出のグルーピング用）
-        questionBankId: options?.questionId ?? savedQuestion?.id ?? null
+        // 記録をバンク問題に紐づける（スコア推移・再提出のグルーピング用）。
+        // 深掘りターンは親記録に紐づけ、挑戦回数のカウントには含めない
+        questionBankId: options?.parentRecordId ? null : options?.questionId ?? savedQuestion?.id ?? null,
+        parentRecordId: options?.parentRecordId ?? null
       }
     });
 
@@ -568,11 +646,20 @@ export async function evaluatePracticeInstant(params: {
   universityName?: string;
   charLimit?: number;
   questionTitle?: string;
+  // 面接の深掘りターン（保存なしのため、前のやり取りをクライアントから受け取る）
+  previousTurn?: { question: string; answer: string };
 }) {
   try {
     const user = await getCurrentUser();
     if (params.questionTitle && params.questionTitle.length > 60) {
       throw new ValidationError("問題タイトルは60字以内で入力してください");
+    }
+    if (
+      params.previousTurn &&
+      (countCharacters(params.previousTurn.question) > MAX_PROMPT_CHARS ||
+        countCharacters(params.previousTurn.answer) > MAX_ANSWER_CHARS)
+    ) {
+      throw new ValidationError("前のやり取りが長すぎます");
     }
     const { authoritativePromptText, totalScore, feedbackPayload } = await runRubricEvaluation(
       user,
@@ -582,12 +669,13 @@ export async function evaluatePracticeInstant(params: {
       {
         questionId: params.questionId,
         universityName: params.universityName,
-        charLimit: params.charLimit
+        charLimit: params.charLimit,
+        previousTurn: params.previousTurn
       }
     );
 
     let savedQuestion: { id: string; status: string; created: boolean } | null = null;
-    if (!params.questionId) {
+    if (!params.questionId && !params.previousTurn) {
       try {
         savedQuestion = await autoSaveCustomQuestion(
           user,

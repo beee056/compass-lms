@@ -218,7 +218,8 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
           <span className="bg-[#c94d43]" />
         </div>
 
-        <div className="grid gap-6 p-5 md:p-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="space-y-6 p-5 md:p-6">
+          <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[#3346a3]">Practice desk</p>
@@ -313,6 +314,11 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
               </div>
             </div>
 
+          </div>
+          </div>
+
+          {/* 検索行から下は全幅1カラムで表示する */}
+          <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative w-full sm:max-w-sm">

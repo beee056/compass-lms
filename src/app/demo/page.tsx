@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import {
   AlertTriangle,
   BookOpen,
@@ -133,7 +135,8 @@ function MetricCard({ label, value, detail, icon: Icon, tone }: MetricCardProps)
   );
 }
 
-export default function PublicDemoPage() {
+export default async function PublicDemoPage() {
+  const { userId } = await auth();
   return (
     <div className="space-y-10 pb-16 text-[#17202a]">
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -146,9 +149,35 @@ export default function PublicDemoPage() {
             <span className="bg-[#17202a]" />
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-md border border-[#d8dee4] bg-white px-3 py-1 text-xs font-bold text-slate-600">
-            <ShieldCheck className="h-3.5 w-3.5 text-[#137a5b]" />
-            ログイン不要の公開デモ
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-md border border-[#d8dee4] bg-white px-3 py-1 text-xs font-bold text-slate-600">
+              <ShieldCheck className="h-3.5 w-3.5 text-[#137a5b]" />
+              ログイン不要の公開デモ
+            </div>
+            {/* ログイン状態に応じた本番アプリへの導線 */}
+            {userId ? (
+              <Link
+                href="/"
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3346a3] px-4 text-sm font-black text-white transition-colors hover:bg-[#2a3a8c]"
+              >
+                <Compass className="h-4 w-4" />
+                自分のワークスペースを開く
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2">
+                <SignInButton mode="modal">
+                  <button className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d8dee4] bg-white px-4 text-sm font-bold text-[#17202a] transition-colors hover:border-[#3346a3] hover:text-[#3346a3]">
+                    ログイン
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3346a3] px-4 text-sm font-black text-white transition-colors hover:bg-[#2a3a8c]">
+                    <Sparkles className="h-4 w-4" />
+                    無料で始める
+                  </button>
+                </SignUpButton>
+              </div>
+            )}
           </div>
           <h1 className="mt-5 text-4xl font-black text-[#17202a] md:text-6xl">
             Scholar Compass

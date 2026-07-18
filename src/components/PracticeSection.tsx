@@ -3,7 +3,7 @@ import { toast } from "@/lib/toast";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PenTool, Plus, Loader2, Sparkles, AlertCircle, BookOpen, Wand2, CheckCircle2, MinusCircle, ChevronDown } from "lucide-react";
+import { PenTool, Plus, Loader2, Sparkles, AlertCircle, BookOpen, Wand2, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
-import { RUBRICS, describeTotalScoreFormula, type PracticeKind } from "@/lib/rubrics";
+import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion, getInterviewResponseMetrics, inferCharLimit } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
+import { stripModelAnswerMetadata } from "@/lib/grading-context";
+import PracticeFeedbackView from "@/components/PracticeFeedbackView";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
 
@@ -21,14 +23,6 @@ interface QuestionDetail {
   prompt: string;
   modelAnswer: string | null;
 }
-
-// レベル別の配色
-const LEVEL_STYLE: Record<number, string> = {
-  4: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  3: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  2: "bg-amber-50 text-amber-700 border-amber-200",
-  1: "bg-red-50 text-red-700 border-red-200"
-};
 
 function scoreColor(score: number): string {
   if (score >= 85) return "text-emerald-600";
@@ -64,6 +58,9 @@ export default function PracticeSection({
   const [error, setError] = useState<string | null>(null);
   const [questionDetails, setQuestionDetails] = useState<Record<string, QuestionDetail>>({});
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [fieldFilter, setFieldFilter] = useState("");
+  // 添削完了後、ダイアログを閉じずにその場で結果を表示する（スクロール位置を動かさない）
+  const [dialogResult, setDialogResult] = useState<{ score: number; feedback: any } | null>(null);
 
   // 問題生成フォーム（メンター用）
   const [genKind, setGenKind] = useState<PracticeKind>("小論文");
@@ -79,12 +76,21 @@ export default function PracticeSection({
   const selectedQuestion = questionBank.find((q) => q.id === selectedQuestionId);
   const selectedQuestionDetail = selectedQuestionId ? questionDetails[selectedQuestionId] : undefined;
 
-  // 選択中の演習種類に一致する問題だけを、五十音順で表示する
+  // 選択中の演習種類に一致する問題の分野・系統（university欄）の一覧
+  const fieldOptions = useMemo(() => {
+    const values = questionBank
+      .filter((q) => q.category === kind && q.university)
+      .map((q) => String(q.university));
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, "ja"));
+  }, [questionBank, kind]);
+
+  // 選択中の演習種類（+分野フィルタ）に一致する問題だけを、五十音順で表示する
   const bankQuestionsForKind = useMemo(() => {
     return questionBank
       .filter((q) => q.category === kind)
+      .filter((q) => !fieldFilter || q.university === fieldFilter)
       .sort((a, b) => String(a.title).localeCompare(String(b.title), "ja"));
-  }, [questionBank, kind]);
+  }, [questionBank, kind, fieldFilter]);
 
   const applyQuestionDetail = (questionKind: PracticeKind, question: any, detail: QuestionDetail) => {
     setPromptText(questionKind === "面接" ? getInterviewMainQuestion(detail.prompt) : detail.prompt);
@@ -129,11 +135,25 @@ export default function PracticeSection({
 
   const handleKindChange = (nextKind: PracticeKind) => {
     setKind(nextKind);
+    setFieldFilter("");
     // 種類を切り替えたら、不一致になった選択中の問題はリセットする
     if (selectedQuestion && selectedQuestion.category !== nextKind) {
       setSelectedQuestionId("");
       setPromptText("");
     }
+  };
+
+  const resetPracticeForm = () => {
+    setPromptText("");
+    setAnswer("");
+    setSelectedQuestionId("");
+    setDialogResult(null);
+    setError(null);
+  };
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) resetPracticeForm();
   };
 
   // 教材ライブラリ等から ?practiceQuestion=<id> で遷移した場合、その問題を選択した状態で開く。
@@ -175,13 +195,10 @@ export default function PracticeSection({
         charLimit: kind !== "面接" && charLimit ? parseInt(charLimit, 10) || undefined : undefined,
         questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined
       });
-      if (result.success) {
-        toast.success("AI添削が完了しました。結果は下の演習記録に表示されます");
-        setOpen(false);
-        setPromptText("");
-        setAnswer("");
-        setSelectedQuestionId("");
-        // ページ全体をリロードせず、サーバーコンポーネントだけ再取得する（スクロール位置を保持）
+      if (result.success && (result as any).feedback) {
+        toast.success("AI添削が完了しました");
+        // ダイアログは閉じず、その場で結果を表示する。記録一覧は裏で最新化する
+        setDialogResult({ score: (result as any).score, feedback: (result as any).feedback });
         router.refresh();
       } else {
         setError(result.error ?? "添削に失敗しました");
@@ -245,18 +262,49 @@ export default function PracticeSection({
       </div>
 
       {/* ===== 演習・添削ダイアログ ===== */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[720px] bg-white h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-blue-500" />
-              AI添削の実行
+              {dialogResult ? "AI添削の結果" : "AI添削の実行"}
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-sm">
-              設問と解答を入力すると、PIVOT&QUESTルーブリック（レベル1〜4）に基づいてAIが添削します。
+              {dialogResult
+                ? "この結果は演習記録にも保存されています。"
+                : "設問と解答を入力すると、PIVOT&QUESTルーブリックに基づいてAIが添削します。"}
             </DialogDescription>
           </DialogHeader>
 
+          {dialogResult ? (
+            <div className="mt-2">
+              <div className="mb-5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-5 py-4">
+                <span className="text-sm font-bold text-slate-600">総合評価（100点満点）</span>
+                <span className={`text-3xl font-black ${scoreColor(dialogResult.score ?? 0)}`}>
+                  {dialogResult.score}
+                  <span className="ml-1 text-sm font-bold text-slate-400">/ 100</span>
+                </span>
+              </div>
+              <PracticeFeedbackView feedback={dialogResult.feedback} />
+              <DialogFooter className="mt-6 pt-4 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetPracticeForm}
+                  className="border-slate-200 text-slate-600 font-semibold"
+                >
+                  続けて演習する
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleDialogOpenChange(false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[130px]"
+                >
+                  閉じる
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="mt-2">
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm flex items-center gap-2">
@@ -292,22 +340,39 @@ export default function PracticeSection({
 
               {inputMode === "bank" && (
                 <div className="grid gap-3">
-                  <Label className="text-slate-700 font-semibold text-sm">
-                    演習問題を選択
-                    <span className="ml-2 font-medium text-slate-400">（「{kind}」の問題 {bankQuestionsForKind.length}問）</span>
-                  </Label>
-                  <select
-                    value={selectedQuestionId}
-                    onChange={(e) => handleBankSelect(e.target.value)}
-                    className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-                  >
-                    <option value="">練習したいテーマを選んでください</option>
-                    {bankQuestionsForKind.map((q: any) => (
-                      <option key={q.id} value={q.id}>
-                        {q.title}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+                    <div className="grid gap-2">
+                      <Label className="text-slate-700 font-semibold text-sm">
+                        演習問題を選択
+                        <span className="ml-2 font-medium text-slate-400">（「{kind}」{bankQuestionsForKind.length}問）</span>
+                      </Label>
+                      <select
+                        value={selectedQuestionId}
+                        onChange={(e) => handleBankSelect(e.target.value)}
+                        className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        <option value="">練習したいテーマを選んでください</option>
+                        {bankQuestionsForKind.map((q: any) => (
+                          <option key={q.id} value={q.id}>
+                            {q.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-slate-700 font-semibold text-sm">分野・系統で絞り込み</Label>
+                      <select
+                        value={fieldFilter}
+                        onChange={(e) => setFieldFilter(e.target.value)}
+                        className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        <option value="">すべての分野</option>
+                        {fieldOptions.map((field) => (
+                          <option key={field} value={field}>{field}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   {bankQuestionsForKind.length === 0 && (
                     <p className="text-xs text-slate-400">
                       「{kind}」の問題がまだありません。演習の種類を変えるか、「自分で設問を入力する」をご利用ください。
@@ -354,7 +419,7 @@ export default function PracticeSection({
                           <div className="border-t border-blue-100 px-3 py-3">
                             {selectedQuestionDetail.modelAnswer ? (
                               <p className="whitespace-pre-wrap text-sm font-medium leading-7 text-slate-700">
-                                {selectedQuestionDetail.modelAnswer}
+                                {stripModelAnswerMetadata(selectedQuestionDetail.modelAnswer)}
                               </p>
                             ) : (
                               <p className="text-sm font-medium text-slate-500">回答例はまだ準備中です。</p>
@@ -407,7 +472,7 @@ export default function PracticeSection({
               <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
                 <h4 className="font-bold text-blue-900 text-sm flex items-center gap-2 mb-2">
                   <BookOpen className="h-4 w-4" />
-                  「{kind}」の評価軸（各軸0〜100点 / {describeTotalScoreFormula(kind)}）
+                  「{kind}」の評価軸（各軸0〜100点で採点）
                 </h4>
                 <div className="text-xs text-blue-800/80 space-y-1">
                   <p>
@@ -482,6 +547,7 @@ export default function PracticeSection({
               </Button>
             </DialogFooter>
           </form>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -618,121 +684,7 @@ export default function PracticeSection({
 
                 {isV2 ? (
                   <div className="p-5">
-                    <h4 className="font-bold text-slate-800 mb-2">総評</h4>
-                    <p className="text-sm text-slate-600 mb-6 leading-relaxed bg-slate-50 p-4 rounded-lg whitespace-pre-wrap">
-                      {feedback.overallFeedback}
-                    </p>
-
-                    <h4 className="font-bold text-slate-800 mb-3 border-b pb-2">
-                      {feedback.version >= 4 ? "ルーブリック評価（各軸100点・レベル併記）" : "ルーブリック評価（レベル1〜4）"}
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                      {feedback.axes.map((axis: any) => (
-                        <div key={axis.key} className={`border rounded-lg p-3.5 ${axis.level ? "border-slate-100 bg-white" : "border-dashed border-slate-200 bg-slate-50/50"}`}>
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <div className="text-xs font-bold text-slate-700">
-                              {axis.label}
-                              <span className="ml-1.5 font-semibold text-slate-400">
-                                {axis.group === "common" ? "共通" : "固有"}
-                              </span>
-                            </div>
-                            {axis.level ? (
-                              <div className="flex items-center gap-1.5">
-                                {typeof axis.score === "number" && (
-                                  <span className="shrink-0 text-xs font-black text-slate-800">{axis.score}点</span>
-                                )}
-                                <span className={`shrink-0 text-[11px] font-black px-2 py-0.5 rounded border ${LEVEL_STYLE[axis.level]}`}>
-                                  Lv.{axis.level} {axis.levelLabel}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-400">
-                                {axis.aiEvaluable === true ? "今回対象外" : "対面評価"}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-600 leading-relaxed">{axis.comment}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {feedback.deductions && feedback.deductions.length > 0 && (
-                      <div className="mb-6">
-                        <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                          <MinusCircle className="h-4 w-4 text-red-500" />
-                          減点事項
-                        </h4>
-                        <ul className="space-y-1.5">
-                          {feedback.deductions.map((d: any, i: number) => (
-                            <li key={i} className="flex gap-2 text-sm text-slate-600">
-                              <span className={`shrink-0 text-[11px] font-black px-1.5 py-0.5 rounded self-start mt-0.5 ${d.severity === "大幅" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
-                                {d.severity}
-                              </span>
-                              <span><strong>{d.item}:</strong> {d.detail}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {feedback.checklist && feedback.checklist.length > 0 && (
-                      <div className="mb-6">
-                        <h4 className="font-bold text-slate-800 mb-2">要点カバレッジ（志望理由書 43要点ガイド）</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {feedback.checklist.map((c: any, i: number) => (
-                            <div key={i} className="flex items-start gap-2 text-xs text-slate-600 border border-slate-100 rounded-md p-2.5">
-                              <span className={`shrink-0 font-black px-1.5 py-0.5 rounded text-[10px] ${
-                                c.coverage === "十分" ? "bg-emerald-100 text-emerald-700" : c.coverage === "部分的" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
-                              }`}>
-                                {c.coverage}
-                              </span>
-                              <span><strong className="text-slate-700">{c.category}</strong><br />{c.comment}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid gap-4 sm:grid-cols-2 mb-6">
-                      <div>
-                        <h4 className="font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
-                          <CheckCircle2 className="h-4 w-4" />
-                          強み・評価点
-                        </h4>
-                        <ul className="space-y-1.5">
-                          {feedback.strengths?.map((s: string, i: number) => (
-                            <li key={i} className="flex gap-2 text-sm text-slate-600">
-                              <span className="text-emerald-500 font-bold mt-0.5">•</span>
-                              {s}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-amber-700 mb-2 flex items-center gap-1.5">
-                          <AlertCircle className="h-4 w-4" />
-                          改善点・課題
-                        </h4>
-                        <ul className="space-y-1.5">
-                          {feedback.improvements?.map((s: string, i: number) => (
-                            <li key={i} className="flex gap-2 text-sm text-slate-600">
-                              <span className="text-amber-500 font-bold mt-0.5">•</span>
-                              {s}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <h4 className="font-bold text-slate-800 mb-2">次のアクション</h4>
-                    <ul className="space-y-2">
-                      {feedback.nextActions?.map((advice: string, idx: number) => (
-                        <li key={idx} className="flex gap-2 text-sm text-slate-600">
-                          <span className="text-blue-500 font-bold mt-0.5">{idx + 1}.</span>
-                          {advice}
-                        </li>
-                      ))}
-                    </ul>
+                    <PracticeFeedbackView feedback={feedback} />
                   </div>
                 ) : feedback ? (
                   /* 旧形式（3観点スコア）の表示互換 */

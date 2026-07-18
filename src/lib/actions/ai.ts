@@ -80,17 +80,20 @@ function buildAxisSchema(axes: Pick<RubricAxis, "key" | "label" | "questionDepen
   return z.object(shape);
 }
 
-export async function evaluateWithRubric(
-  studentId: string,
+interface RubricEvaluationOptions {
+  universityName?: string;
+  charLimit?: number;
+  questionId?: string;
+}
+
+// 添削の共通コア。認可と保存は呼び出し側（evaluateWithRubric / evaluatePracticeInstant）が担う。
+async function runRubricEvaluation(
+  user: Awaited<ReturnType<typeof getCurrentUser>>,
   type: string,
   promptText: string,
   answer: string,
-  options?: { universityName?: string; charLimit?: number; questionId?: string }
+  options?: RubricEvaluationOptions
 ) {
-  try {
-    // 生徒は自分自身、メンターは自テナントの生徒のみ添削可能
-    const user = await getCurrentUser();
-    await assertStudentAccess(user, studentId);
     const kind = resolveKind(type);
 
     if (!promptText.trim() || !answer.trim()) {
@@ -106,9 +109,6 @@ export async function evaluateWithRubric(
     ) {
       throw new ValidationError(`規定字数は50〜${MAX_ANSWER_CHARS}字で指定してください`);
     }
-
-    const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
-    if (!student) throw new Error("Student not found");
 
     const rubric = RUBRICS[kind];
     const selectedQuestion = options?.questionId
@@ -449,6 +449,31 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
       checklist: (evaluation as any).checklist ?? null
     };
 
+    return { authoritativePromptText, totalScore, feedbackPayload };
+}
+
+export async function evaluateWithRubric(
+  studentId: string,
+  type: string,
+  promptText: string,
+  answer: string,
+  options?: RubricEvaluationOptions
+) {
+  try {
+    // 生徒は自分自身、メンターは自テナントの生徒のみ添削可能
+    const user = await getCurrentUser();
+    await assertStudentAccess(user, studentId);
+    const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
+    if (!student) throw new Error("Student not found");
+
+    const { authoritativePromptText, totalScore, feedbackPayload } = await runRubricEvaluation(
+      user,
+      type,
+      promptText,
+      answer,
+      options
+    );
+
     const record = await prisma.practiceRecord.create({
       data: {
         id: `prac-${randomUUID()}`,
@@ -464,9 +489,38 @@ ${applicabilityRules ? `\n${applicabilityRules}` : ""}
     revalidatePath(`/students/${studentId}`);
     revalidatePath(`/portal`);
 
-    return { success: true, recordId: record.id };
+    return { success: true, recordId: record.id, score: totalScore, feedback: feedbackPayload };
   } catch (error: any) {
     console.error("AI Evaluation failed:", error);
+    return { success: false, error: toClientError(error, "添削の実行に失敗しました。時間をおいて再度お試しください") };
+  }
+}
+
+// 保存なしのインスタント添削（教材ライブラリ用）。演習記録には残らない。
+export async function evaluatePracticeInstant(params: {
+  type: string;
+  promptText: string;
+  answer: string;
+  questionId?: string;
+  universityName?: string;
+  charLimit?: number;
+}) {
+  try {
+    const user = await getCurrentUser();
+    const { totalScore, feedbackPayload } = await runRubricEvaluation(
+      user,
+      params.type,
+      params.promptText,
+      params.answer,
+      {
+        questionId: params.questionId,
+        universityName: params.universityName,
+        charLimit: params.charLimit
+      }
+    );
+    return { success: true, score: totalScore, feedback: feedbackPayload };
+  } catch (error: any) {
+    console.error("Instant AI Evaluation failed:", error);
     return { success: false, error: toClientError(error, "添削の実行に失敗しました。時間をおいて再度お試しください") };
   }
 }

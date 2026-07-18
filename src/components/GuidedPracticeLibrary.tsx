@@ -6,14 +6,18 @@ import {
   ChevronDown,
   ClipboardList,
   FilePenLine,
+  Loader2,
   MessageSquareText,
   Search,
   SearchCheck,
   Sparkles,
   Trash2
 } from "lucide-react";
-import { RUBRICS, describeTotalScoreFormula, type PracticeKind } from "@/lib/rubrics";
+import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion } from "@/lib/practice-evaluation";
+import { stripModelAnswerMetadata } from "@/lib/grading-context";
+import { evaluatePracticeInstant } from "@/lib/actions/ai";
+import PracticeFeedbackView from "@/components/PracticeFeedbackView";
 
 const KIND_OPTIONS: PracticeKind[] = ["志望理由書", "小論文", "面接"];
 const PAGE_SIZE = 12;
@@ -43,7 +47,6 @@ interface PracticeQuestion {
   id: string;
   category: string;
   title: string;
-  source: string;
   university: string | null;
 }
 
@@ -61,6 +64,7 @@ interface GuidedPracticeLibraryProps {
 export default function GuidedPracticeLibrary({ questions, practiceHref = null }: GuidedPracticeLibraryProps) {
   const [activeKind, setActiveKind] = useState<PracticeKind>("志望理由書");
   const [query, setQuery] = useState("");
+  const [fieldFilter, setFieldFilter] = useState("");
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -68,6 +72,9 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
   const [questionDetails, setQuestionDetails] = useState<Record<string, PracticeQuestionDetail>>({});
   const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
+  const [gradingQuestionId, setGradingQuestionId] = useState<string | null>(null);
+  const [gradeResults, setGradeResults] = useState<Record<string, { score: number; feedback: any }>>({});
+  const [gradeErrors, setGradeErrors] = useState<Record<string, string>>({});
 
   const counts = useMemo(() => {
     return KIND_OPTIONS.reduce<Record<PracticeKind, number>>((acc, kind) => {
@@ -76,19 +83,27 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
     }, { 志望理由書: 0, 小論文: 0, 面接: 0 });
   }, [questions]);
 
+  // 選択中の演習種類に存在する分野・系統（university欄）の一覧
+  const fieldOptions = useMemo(() => {
+    const values = questions
+      .filter((question) => question.category === activeKind && question.university)
+      .map((question) => String(question.university));
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, "ja"));
+  }, [activeKind, questions]);
+
   const filteredQuestions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return questions.filter((question) => {
       if (question.category !== activeKind) return false;
+      if (fieldFilter && question.university !== fieldFilter) return false;
       if (!normalizedQuery) return true;
       const haystack = [
         question.title,
-        question.university ?? "",
-        question.source
+        question.university ?? ""
       ].join(" ").toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [activeKind, query, questions]);
+  }, [activeKind, fieldFilter, query, questions]);
 
   const visibleQuestions = filteredQuestions.slice(0, visibleCount);
   const rubric = RUBRICS[activeKind];
@@ -97,8 +112,42 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
 
   function selectKind(kind: PracticeKind) {
     setActiveKind(kind);
+    setFieldFilter("");
     setOpenQuestionId(null);
     setVisibleCount(PAGE_SIZE);
+  }
+
+  async function gradeDraft(question: PracticeQuestion, detail: PracticeQuestionDetail) {
+    const draft = drafts[question.id] ?? "";
+    if (!draft.trim() || gradingQuestionId) return;
+
+    setGradingQuestionId(question.id);
+    setGradeErrors((current) => {
+      const next = { ...current };
+      delete next[question.id];
+      return next;
+    });
+    try {
+      const result = await evaluatePracticeInstant({
+        type: question.category,
+        promptText: detail.prompt,
+        answer: draft,
+        questionId: question.id
+      });
+      if (result.success && (result as any).feedback) {
+        setGradeResults((current) => ({
+          ...current,
+          [question.id]: { score: (result as any).score, feedback: (result as any).feedback }
+        }));
+      } else {
+        setGradeErrors((current) => ({
+          ...current,
+          [question.id]: (result as any).error ?? "添削に失敗しました。時間をおいて再度お試しください"
+        }));
+      }
+    } finally {
+      setGradingQuestionId(null);
+    }
   }
 
   function updateQuery(value: string) {
@@ -174,7 +223,7 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                 学習資料・ガイダンスで演習する
               </h2>
               <p className="mt-3 text-sm font-medium leading-6 text-slate-600">
-                ここでの入力は保存されません。教材を確認しながら、設問ごとに下書きと回答例の照合だけを行えます。
+                ここでの入力は保存されません。設問ごとに下書きを書き、その場でAI添削（保存なし）と回答例の照合ができます。
               </p>
             </div>
 
@@ -235,9 +284,6 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                   </h3>
                   <p className="mt-1 text-xs font-bold text-slate-600">{activeMeta.note}</p>
                 </div>
-                <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-[#17202a] ring-1 ring-black/5">
-                  {describeTotalScoreFormula(activeKind).replace("総合 = ", "")}
-                </span>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {[...rubric.commonAxes, ...rubric.specificAxes].map((axis) => (
@@ -245,9 +291,9 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[#17202a]">
                       <span>
                         {axis.label}
-                        <span className="ml-2 text-[11px] font-bold text-slate-400">
-                          {axis.aiEvaluable ? "AI評価" : "対面評価"}
-                        </span>
+                        {!axis.aiEvaluable && (
+                          <span className="ml-2 text-[11px] font-bold text-slate-400">対面評価</span>
+                        )}
                       </span>
                       <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
                     </summary>
@@ -265,17 +311,34 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative w-full sm:max-w-sm">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={query}
-                  onChange={(event) => updateQuery(event.target.value)}
-                  placeholder="タイトル・大学名で検索"
-                  aria-label="問題を検索"
-                  className="h-11 w-full rounded-md border border-[#d8dee4] bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15"
-                />
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={query}
+                    onChange={(event) => updateQuery(event.target.value)}
+                    placeholder="タイトル・分野で検索"
+                    aria-label="問題を検索"
+                    className="h-11 w-full rounded-md border border-[#d8dee4] bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15"
+                  />
+                </div>
+                <select
+                  value={fieldFilter}
+                  onChange={(event) => {
+                    setFieldFilter(event.target.value);
+                    setOpenQuestionId(null);
+                    setVisibleCount(PAGE_SIZE);
+                  }}
+                  aria-label="分野・系統で絞り込み"
+                  className="h-11 w-full rounded-md border border-[#d8dee4] bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15 sm:w-56"
+                >
+                  <option value="">すべての分野・系統</option>
+                  {fieldOptions.map((field) => (
+                    <option key={field} value={field}>{field}</option>
+                  ))}
+                </select>
               </div>
-              <p className="text-xs font-bold text-slate-500">
+              <p className="shrink-0 text-xs font-bold text-slate-500">
                 {filteredQuestions.length}問中 {visibleQuestions.length}問を表示
               </p>
             </div>
@@ -305,16 +368,13 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                         aria-expanded={isOpen}
                       >
                         <span className="min-w-0">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">
-                              {question.source === "NOTEBOOKLM" ? "NotebookLM" : question.source === "AI_GENERATED" ? "AI生成" : "教材"}
-                            </span>
-                            {question.university && (
+                          {question.university && (
+                            <span className="flex flex-wrap items-center gap-2">
                               <span className="rounded-sm bg-[#eef1ff] px-2 py-0.5 text-[11px] font-black text-[#3346a3]">
                                 {question.university}
                               </span>
-                            )}
-                          </span>
+                            </span>
+                          )}
                           <span className="mt-2 block text-base font-black leading-6 text-[#17202a]">{question.title}</span>
                         </span>
                         <ChevronDown className={`mt-1 h-5 w-5 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -359,10 +419,48 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                                   placeholder={activeKind === "面接" ? "この1問への回答を、まず60〜90秒程度で話すつもりで書いてみる" : "ここに自分の解答を書いてから、回答例と照合する"}
                                   className="min-h-[190px] w-full resize-y rounded-md border border-[#d8dee4] bg-white p-3 text-sm font-medium leading-7 text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15"
                                 />
-                                <p className="mt-1 text-right text-xs font-bold text-slate-400">
-                                  {activeKind === "面接" ? getInterviewDraftLabel(draft) : `${Array.from(draft).length}字`}
-                                </p>
+                                <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => void gradeDraft(question, detail)}
+                                    disabled={!draft.trim() || gradingQuestionId !== null}
+                                    className="inline-flex items-center gap-2 rounded-md bg-[#137a5b] px-4 py-2 text-sm font-black text-white transition-colors hover:bg-[#0f6349] disabled:cursor-not-allowed disabled:bg-slate-300"
+                                  >
+                                    {gradingQuestionId === question.id ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        添削中...（30秒ほどかかります）
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Sparkles className="h-4 w-4" />
+                                        この下書きをAI添削（保存なし）
+                                      </>
+                                    )}
+                                  </button>
+                                  <p className="text-right text-xs font-bold text-slate-400">
+                                    {activeKind === "面接" ? getInterviewDraftLabel(draft) : `${Array.from(draft).length}字`}
+                                  </p>
+                                </div>
+                                {gradeErrors[question.id] && (
+                                  <p className="mt-2 rounded-md border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-600">
+                                    {gradeErrors[question.id]}
+                                  </p>
+                                )}
                               </section>
+
+                              {gradeResults[question.id] && (
+                                <section className="rounded-md border border-[#d8dee4] bg-white p-4">
+                                  <div className="mb-4 flex items-center justify-between rounded-md bg-[#fbfcf8] px-4 py-3 ring-1 ring-[#e3e7e0]">
+                                    <span className="text-sm font-black text-slate-600">AI添削の結果（この場限り・保存されません）</span>
+                                    <span className="text-2xl font-black text-[#17202a]">
+                                      {gradeResults[question.id].score}
+                                      <span className="ml-1 text-sm font-bold text-slate-400">/ 100</span>
+                                    </span>
+                                  </div>
+                                  <PracticeFeedbackView feedback={gradeResults[question.id].feedback} />
+                                </section>
+                              )}
 
                               <div className="grid gap-3 md:grid-cols-2">
                                 <div className="rounded-md border border-[#e3e7e0] bg-[#fbfcf8] p-3">
@@ -393,7 +491,7 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                                   {answerOpen[question.id] && (
                                     <div className="border-t border-[#edf0ec] p-3">
                                       {detail.modelAnswer ? (
-                                        <p className="whitespace-pre-wrap text-sm font-medium leading-7 text-slate-700">{detail.modelAnswer}</p>
+                                        <p className="whitespace-pre-wrap text-sm font-medium leading-7 text-slate-700">{stripModelAnswerMetadata(detail.modelAnswer)}</p>
                                       ) : (
                                         <p className="text-sm font-medium leading-6 text-slate-500">回答例はまだ準備中です。</p>
                                       )}
@@ -405,7 +503,7 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                               {practiceHref && (
                                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#cbd4ff] bg-[#eef1ff] p-3">
                                   <p className="text-xs font-bold leading-5 text-[#3346a3]">
-                                    書き上がったら、この問題のままAI添削へ進めます（下書きも引き継がれます）。
+                                    結果を演習記録に残したい場合は、ポータルの演習へ進んでください（下書きも引き継がれます）。
                                   </p>
                                   <a
                                     href={`${practiceHref}?practiceQuestion=${encodeURIComponent(question.id)}`}

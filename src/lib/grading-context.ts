@@ -83,6 +83,11 @@ export function cleanModelAnswer(value: string): string {
     .trim();
 }
 
+// UI表示用: 回答例本文から内部メタデータ（難易度・NotebookLM参照・出典）だけを取り除く
+export function stripModelAnswerMetadata(value: string): string {
+  return value.replace(METADATA_SECTION, "").trim();
+}
+
 export function includePrimaryReferenceCandidate(
   candidates: GradingReferenceCandidate[],
   primary?: GradingReferenceCandidate | null

@@ -16,6 +16,7 @@ import {
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion } from "@/lib/practice-evaluation";
 import { stripModelAnswerMetadata } from "@/lib/grading-context";
+import { getFieldCategory } from "@/lib/field-category";
 import { evaluatePracticeInstant } from "@/lib/actions/ai";
 import PracticeFeedbackView from "@/components/PracticeFeedbackView";
 
@@ -83,11 +84,12 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
     }, { 志望理由書: 0, 小論文: 0, 面接: 0 });
   }, [questions]);
 
-  // 選択中の演習種類に存在する分野・系統（university欄）の一覧
+  // 選択中の演習種類に存在する系統ラベル（university欄を正規化した大くくり）の一覧
   const fieldOptions = useMemo(() => {
     const values = questions
-      .filter((question) => question.category === activeKind && question.university)
-      .map((question) => String(question.university));
+      .filter((question) => question.category === activeKind)
+      .map((question) => getFieldCategory(question.university))
+      .filter((category): category is string => Boolean(category));
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, "ja"));
   }, [activeKind, questions]);
 
@@ -95,11 +97,12 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
     const normalizedQuery = query.trim().toLowerCase();
     return questions.filter((question) => {
       if (question.category !== activeKind) return false;
-      if (fieldFilter && question.university !== fieldFilter) return false;
+      if (fieldFilter && getFieldCategory(question.university) !== fieldFilter) return false;
       if (!normalizedQuery) return true;
       const haystack = [
         question.title,
-        question.university ?? ""
+        question.university ?? "",
+        getFieldCategory(question.university) ?? ""
       ].join(" ").toLowerCase();
       return haystack.includes(normalizedQuery);
     });
@@ -317,7 +320,7 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                   <input
                     value={query}
                     onChange={(event) => updateQuery(event.target.value)}
-                    placeholder="タイトル・分野で検索"
+                    placeholder="タイトル・系統で検索"
                     aria-label="問題を検索"
                     className="h-11 w-full rounded-md border border-[#d8dee4] bg-white pl-9 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15"
                   />
@@ -329,10 +332,10 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                     setOpenQuestionId(null);
                     setVisibleCount(PAGE_SIZE);
                   }}
-                  aria-label="分野・系統で絞り込み"
+                  aria-label="系統で絞り込み"
                   className="h-11 w-full rounded-md border border-[#d8dee4] bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-[#3346a3] focus:ring-2 focus:ring-[#3346a3]/15 sm:w-56"
                 >
-                  <option value="">すべての分野・系統</option>
+                  <option value="">すべての系統</option>
                   {fieldOptions.map((field) => (
                     <option key={field} value={field}>{field}</option>
                   ))}
@@ -368,10 +371,10 @@ export default function GuidedPracticeLibrary({ questions, practiceHref = null }
                         aria-expanded={isOpen}
                       >
                         <span className="min-w-0">
-                          {question.university && (
+                          {getFieldCategory(question.university) && (
                             <span className="flex flex-wrap items-center gap-2">
                               <span className="rounded-sm bg-[#eef1ff] px-2 py-0.5 text-[11px] font-black text-[#3346a3]">
-                                {question.university}
+                                {getFieldCategory(question.university)}
                               </span>
                             </span>
                           )}

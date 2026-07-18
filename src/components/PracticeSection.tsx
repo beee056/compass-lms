@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
+import { evaluatePracticeInstant, evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion, getInterviewResponseMetrics, inferCharLimit } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
 import { stripModelAnswerMetadata } from "@/lib/grading-context";
+import { getFieldCategory } from "@/lib/field-category";
 import PracticeFeedbackView from "@/components/PracticeFeedbackView";
 
 const KIND_OPTIONS: PracticeKind[] = ["小論文", "志望理由書", "面接"];
@@ -61,6 +62,9 @@ export default function PracticeSection({
   const [fieldFilter, setFieldFilter] = useState("");
   // 添削完了後、ダイアログを閉じずにその場で結果を表示する（スクロール位置を動かさない）
   const [dialogResult, setDialogResult] = useState<{ score: number; feedback: any } | null>(null);
+  // メンターがカスタム設問を問題バンクへ保存するオプション
+  const [saveToBank, setSaveToBank] = useState(false);
+  const [bankTitle, setBankTitle] = useState("");
 
   // 問題生成フォーム（メンター用）
   const [genKind, setGenKind] = useState<PracticeKind>("小論文");
@@ -76,20 +80,25 @@ export default function PracticeSection({
   const selectedQuestion = questionBank.find((q) => q.id === selectedQuestionId);
   const selectedQuestionDetail = selectedQuestionId ? questionDetails[selectedQuestionId] : undefined;
 
-  // 選択中の演習種類に一致する問題の分野・系統（university欄）の一覧
+  // 選択中の演習種類に存在する系統ラベル（university欄を正規化した大くくり）の一覧
   const fieldOptions = useMemo(() => {
     const values = questionBank
-      .filter((q) => q.category === kind && q.university)
-      .map((q) => String(q.university));
+      .filter((q) => q.category === kind)
+      .map((q) => getFieldCategory(q.university))
+      .filter((category): category is string => Boolean(category));
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, "ja"));
   }, [questionBank, kind]);
 
-  // 選択中の演習種類（+分野フィルタ）に一致する問題だけを、五十音順で表示する
+  // 選択中の演習種類（+系統フィルタ）に一致する問題を、系統→五十音順で表示する
   const bankQuestionsForKind = useMemo(() => {
     return questionBank
       .filter((q) => q.category === kind)
-      .filter((q) => !fieldFilter || q.university === fieldFilter)
-      .sort((a, b) => String(a.title).localeCompare(String(b.title), "ja"));
+      .filter((q) => !fieldFilter || getFieldCategory(q.university) === fieldFilter)
+      .sort((a, b) => {
+        const fieldA = getFieldCategory(a.university) ?? "";
+        const fieldB = getFieldCategory(b.university) ?? "";
+        return fieldA.localeCompare(fieldB, "ja") || String(a.title).localeCompare(String(b.title), "ja");
+      });
   }, [questionBank, kind, fieldFilter]);
 
   const applyQuestionDetail = (questionKind: PracticeKind, question: any, detail: QuestionDetail) => {
@@ -149,6 +158,8 @@ export default function PracticeSection({
     setSelectedQuestionId("");
     setDialogResult(null);
     setError(null);
+    setSaveToBank(false);
+    setBankTitle("");
   };
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
@@ -190,16 +201,35 @@ export default function PracticeSection({
 
     setError(null);
     startTransition(async () => {
-      const result = await evaluateWithRubric(studentId, kind, promptText, answer, {
+      const commonOptions = {
         universityName: universityName.trim() || undefined,
         charLimit: kind !== "面接" && charLimit ? parseInt(charLimit, 10) || undefined : undefined,
         questionId: inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined
-      });
+      };
+      // メンターのテスト実行は生徒の演習記録に残さない（インスタント添削）
+      const result = isMentorView
+        ? await evaluatePracticeInstant({
+            type: kind,
+            promptText,
+            answer,
+            ...commonOptions,
+            saveQuestionToBank: inputMode === "custom" && saveToBank,
+            questionTitle: bankTitle.trim() || undefined
+          })
+        : await evaluateWithRubric(studentId, kind, promptText, answer, commonOptions);
       if (result.success && (result as any).feedback) {
-        toast.success("AI添削が完了しました");
+        toast.success(isMentorView ? "テスト添削が完了しました（記録には残りません）" : "AI添削が完了しました");
+        if ((result as any).savedQuestionId) {
+          toast.success("設問を問題バンクに追加しました");
+        }
+        if ((result as any).bankSaveError) {
+          toast.error((result as any).bankSaveError);
+        }
         // ダイアログは閉じず、その場で結果を表示する。記録一覧は裏で最新化する
         setDialogResult({ score: (result as any).score, feedback: (result as any).feedback });
-        router.refresh();
+        if (!isMentorView || (result as any).savedQuestionId) {
+          router.refresh();
+        }
       } else {
         setError(result.error ?? "添削に失敗しました");
       }
@@ -271,8 +301,12 @@ export default function PracticeSection({
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-sm">
               {dialogResult
-                ? "この結果は演習記録にも保存されています。"
-                : "設問と解答を入力すると、PIVOT&QUESTルーブリックに基づいてAIが添削します。"}
+                ? isMentorView
+                  ? "テスト実行のため、この結果は生徒の演習記録には保存されていません。"
+                  : "この結果は演習記録にも保存されています。"
+                : isMentorView
+                  ? "テスト実行です。結果は生徒の演習記録に残りません。"
+                  : "設問と解答を入力すると、PIVOT&QUESTルーブリックに基づいてAIが添削します。"}
             </DialogDescription>
           </DialogHeader>
 
@@ -352,21 +386,24 @@ export default function PracticeSection({
                         className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                       >
                         <option value="">練習したいテーマを選んでください</option>
-                        {bankQuestionsForKind.map((q: any) => (
-                          <option key={q.id} value={q.id}>
-                            {q.title}
-                          </option>
-                        ))}
+                        {bankQuestionsForKind.map((q: any) => {
+                          const fieldCategory = getFieldCategory(q.university);
+                          return (
+                            <option key={q.id} value={q.id}>
+                              {fieldCategory ? `【${fieldCategory}】` : ""}{q.title}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div className="grid gap-2">
-                      <Label className="text-slate-700 font-semibold text-sm">分野・系統で絞り込み</Label>
+                      <Label className="text-slate-700 font-semibold text-sm">系統で絞り込み</Label>
                       <select
                         value={fieldFilter}
                         onChange={(e) => setFieldFilter(e.target.value)}
                         className="h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                       >
-                        <option value="">すべての分野</option>
+                        <option value="">すべての系統</option>
                         {fieldOptions.map((field) => (
                           <option key={field} value={field}>{field}</option>
                         ))}
@@ -506,6 +543,28 @@ export default function PracticeSection({
                     required
                     className="border-slate-200 min-h-[100px]"
                   />
+                  {isMentorView && inputMode === "custom" && (
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={saveToBank}
+                          onChange={(e) => setSaveToBank(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        この設問を問題バンクにも追加する（テナント内で共有）
+                      </label>
+                      {saveToBank && (
+                        <Input
+                          value={bankTitle}
+                          onChange={(e) => setBankTitle(e.target.value)}
+                          placeholder="問題タイトル（未入力なら設問の冒頭から自動生成）"
+                          maxLength={60}
+                          className="mt-2 h-10 border-indigo-200 bg-white"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

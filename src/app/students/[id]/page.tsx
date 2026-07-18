@@ -19,8 +19,17 @@ export const maxDuration = 60;
 
 export default async function StudentDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
-  if (user.role === "STUDENT") {
-    redirect("/portal");
+  // 生徒は「自分の生徒ページ」だけ閲覧できる（メンターとURLを共有できる）。
+  // 他の生徒のページを開こうとした場合は自分のページ（無ければポータル）へ戻す。
+  const isStudentViewer = user.role === "STUDENT";
+  if (isStudentViewer) {
+    const ownStudentProfileId = user.studentProfile?.id ?? null;
+    if (!ownStudentProfileId) {
+      redirect("/portal");
+    }
+    if (ownStudentProfileId !== params.id) {
+      redirect(`/students/${ownStudentProfileId}`);
+    }
   }
 
   // 独立した4クエリを並列取得（直列awaitによる体感遅延を解消）
@@ -105,7 +114,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     <div className="w-full animate-in fade-in duration-500 pb-20">
       {/* 戻るボタン & プロフィールヘッダー */}
       <div className="flex items-start gap-4 mb-12 mt-4">
-        <Link href="/" className="p-2.5 bg-white border border-slate-200/60 rounded-full hover:bg-slate-50 transition-colors text-slate-500 shadow-sm mt-1">
+        <Link href={isStudentViewer ? "/portal" : "/"} className="p-2.5 bg-white border border-slate-200/60 rounded-full hover:bg-slate-50 transition-colors text-slate-500 shadow-sm mt-1">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         
@@ -129,12 +138,14 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
                   {u.name} {u.department}
                   {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
                   {/* @ts-ignore */}
-                  {u.id && !u.id.startsWith("mock") && <EditUniversityDialog university={u} />}
+                  {!isStudentViewer && u.id && !u.id.startsWith("mock") && <EditUniversityDialog university={u} />}
                 </span>
               ))}
-              
-              {/* 志望校追加ボタンの配置 */}
-              <AddUniversityDialog studentId={safeStudent.id} templates={templates as any[]} />
+
+              {/* 志望校追加ボタンの配置（メンターのみ） */}
+              {!isStudentViewer && (
+                <AddUniversityDialog studentId={safeStudent.id} templates={templates as any[]} />
+              )}
 
               {safeStudent.highSchool && (
                  <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md ml-2">
@@ -142,13 +153,13 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
                   <span>{safeStudent.highSchool} ({safeStudent.grade || "学年未設定"})</span>
                 </span>
               )}
-              {safeStudent.phone && (
+              {!isStudentViewer && safeStudent.phone && (
                 <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md">
                   <Phone className="h-4 w-4 text-slate-400" />
                   <span>{safeStudent.phone}</span>
                 </span>
               )}
-              {safeStudent.parentEmail && (
+              {!isStudentViewer && safeStudent.parentEmail && (
                 <span className="flex items-center gap-1.5 bg-slate-100/50 px-2.5 py-1 rounded-md">
                   <span className="text-slate-400 text-xs">@</span>
                   <span>{safeStudent.parentEmail}</span>
@@ -156,9 +167,11 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
               )}
             </div>
           </div>
-          <div>
-            <EditStudentDialog student={safeStudent} />
-          </div>
+          {!isStudentViewer && (
+            <div>
+              <EditStudentDialog student={safeStudent} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -166,36 +179,39 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
         <div className="xl:col-span-2 space-y-10">
           {/* Documents Section */}
-          <DocumentList 
-            studentId={safeStudent.id} 
-            driveUrl={safeStudent.driveUrl} 
-            initialDocuments={safeStudent.documents as any[]} 
+          <DocumentList
+            studentId={safeStudent.id}
+            driveUrl={safeStudent.driveUrl}
+            initialDocuments={safeStudent.documents as any[]}
             universities={flatUniversities}
+            isStudent={isStudentViewer}
           />
 
           {/* Tasks Section */}
-          <TaskSection 
-            studentId={safeStudent.id} 
-            initialTasks={safeStudent.tasks as any[]} 
+          <TaskSection
+            studentId={safeStudent.id}
+            initialTasks={safeStudent.tasks as any[]}
+            isStudent={isStudentViewer}
           />
 
           {/* Practice Section */}
-          <PracticeSection 
-            studentId={safeStudent.id} 
-            initialRecords={safeStudent.practiceRecords as any[]} 
-            isMentorView={true}
+          <PracticeSection
+            studentId={safeStudent.id}
+            initialRecords={safeStudent.practiceRecords as any[]}
+            isMentorView={!isStudentViewer}
             questionBank={questionBank}
           />
         </div>
 
         {/* Compass Signature Milestone Column & Activity Log */}
         <div className="space-y-8">
-          <MilestoneSection 
-            studentId={safeStudent.id} 
-            initialMilestones={safeCombinedMilestones as any[]} 
+          <MilestoneSection
+            studentId={safeStudent.id}
+            initialMilestones={safeCombinedMilestones as any[]}
+            isStudent={isStudentViewer}
           />
-          
-          <ActivityLogSection logs={JSON.parse(JSON.stringify(logs))} />
+
+          {!isStudentViewer && <ActivityLogSection logs={JSON.parse(JSON.stringify(logs))} />}
         </div>
       </div>
     </div>

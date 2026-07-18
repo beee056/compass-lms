@@ -146,6 +146,18 @@ export async function getCurrentUser() {
         });
         if (existing) return existing;
 
+        // 同じメールの既存ユーザーがいれば、clerkIdを付け替えて再リンクする。
+        // （Clerkのdev→productionインスタンス切替や、Clerk側でアカウントを作り直した場合、
+        //   clerkIdは変わるがメールは同じ。メールはClerkがサインアップ時に検証済み）
+        const existingByEmail = await tx.user.findUnique({ where: { email } });
+        if (existingByEmail) {
+          return await tx.user.update({
+            where: { id: existingByEmail.id },
+            data: { clerkId: userId },
+            include: { tenant: true, studentProfile: true }
+          });
+        }
+
         // 生徒として招待されているか確認
         const studentProfile = email ? await tx.studentProfile.findUnique({ where: { studentEmail: email } }) : null;
 

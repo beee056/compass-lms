@@ -58,6 +58,7 @@ model StudentProfile {
   practiceRecords PracticeRecord[]
   stepAnswers    StepAnswer[]
   logs           ActivityLog[]
+  sharedTokens   SharedAccessToken[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -207,6 +208,21 @@ model PracticeRecord {
 
   @@index([studentProfileId])
   @@index([studentProfileId, questionBankId])
+}
+
+// 保護者向けの閲覧専用共有トークン。
+// URLを知っている人だけが進捗サマリー（連絡先・答案本文・添削本文は含まない）を閲覧できる。
+model SharedAccessToken {
+  id               String         @id @default(cuid())
+  token            String         @unique // 推測不能なランダム値
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  createdByUserId  String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([studentProfileId])
 }
 
 model Course {

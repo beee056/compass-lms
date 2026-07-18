@@ -12,6 +12,7 @@ import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
 import PracticeSection from "@/components/PracticeSection";
+import ShareLinkManager from "@/components/ShareLinkManager";
 
 // AI添削・問題生成（このページから呼ばれるServer Action）が
 // Vercelの既定タイムアウトを超えないよう上限を延長
@@ -62,6 +63,17 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
   if (!dbStudent) {
     notFound();
   }
+
+  // 保護者向け共有リンク（メンター表示用。有効なものだけ）
+  const shareLinks = isStudentViewer
+    ? []
+    : JSON.parse(JSON.stringify(
+        await prisma.sharedAccessToken.findMany({
+          where: { studentProfileId: params.id, revokedAt: null, expiresAt: { gt: new Date() } },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, token: true, expiresAt: true, createdAt: true }
+        })
+      ));
 
   const student = {
     id: dbStudent.id,
@@ -210,6 +222,8 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
             initialMilestones={safeCombinedMilestones as any[]}
             isStudent={isStudentViewer}
           />
+
+          {!isStudentViewer && <ShareLinkManager studentId={safeStudent.id} links={shareLinks} />}
 
           {!isStudentViewer && <ActivityLogSection logs={JSON.parse(JSON.stringify(logs))} />}
         </div>

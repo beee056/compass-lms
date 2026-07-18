@@ -72,11 +72,11 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
           />
         </div>
         
-        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
-          <div className="flex w-full rounded-md border border-[#d8dee4] bg-[#fbfcf8] p-1 shadow-none md:w-auto">
+        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-3">
+          <div className="flex w-full shrink-0 rounded-md border border-[#d8dee4] bg-[#fbfcf8] p-1 shadow-none md:w-auto">
             <button
               onClick={() => setStatusFilter("ACTIVE")}
-              className={`flex-1 rounded px-6 py-2.5 text-center text-sm font-bold transition-all md:flex-none ${
+              className={`flex-1 whitespace-nowrap rounded px-5 py-2.5 text-center text-sm font-bold transition-all md:flex-none ${
                 statusFilter === "ACTIVE"
                   ? "bg-white text-[#3346a3] shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
@@ -86,7 +86,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
             </button>
             <button
               onClick={() => setStatusFilter("ARCHIVED")}
-              className={`flex-1 rounded px-6 py-2.5 text-center text-sm font-bold transition-all md:flex-none ${
+              className={`flex-1 whitespace-nowrap rounded px-5 py-2.5 text-center text-sm font-bold transition-all md:flex-none ${
                 statusFilter === "ARCHIVED"
                   ? "bg-white text-[#3346a3] shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
@@ -126,7 +126,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
       </div>
 
       {/* 生徒一覧カードグリッド */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {sortedStudents.length === 0 ? (
           <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed border-[#d8dee4] bg-[#fbfcf8] py-20 text-slate-500">
             <p className="font-semibold text-lg mb-2">該当する生徒が見つかりません</p>
@@ -135,12 +135,12 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
         ) : (
           sortedStudents.map((student) => (
             <div key={student.id} className="block group relative">
-              <Card className="relative flex min-h-[260px] flex-col overflow-hidden border-[#d8dee4] bg-white p-5 shadow-sm transition-all duration-300 group-hover:border-[#3346a3]/40 group-hover:shadow-[0_8px_24px_rgba(23,32,42,0.06)] sm:p-8">
+              <Card className="relative flex flex-col overflow-hidden border-[#d8dee4] bg-white p-4 shadow-sm transition-all duration-300 group-hover:border-[#3346a3]/40 group-hover:shadow-[0_8px_24px_rgba(23,32,42,0.06)]">
                 <Link href={`/students/${student.id}`} className="absolute inset-0 z-0" aria-label={`${student.name}の詳細を見る`} />
 
-                <div className="relative z-10 mb-4 flex items-start justify-between gap-2 pointer-events-none">
+                <div className="relative z-10 mb-3 flex items-start justify-between gap-2 pointer-events-none">
                   <div className="min-w-0 flex-1">
-                    <h3 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-normal text-[#17202a] transition-colors group-hover:text-[#3346a3] sm:text-2xl">
+                    <h3 className="flex flex-wrap items-center gap-2 text-lg font-bold tracking-normal text-[#17202a] transition-colors group-hover:text-[#3346a3]">
                       <Link href={`/students/${student.id}`} className="hover:underline pointer-events-auto relative z-20">
                         {student.name}
                       </Link>
@@ -178,15 +178,15 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                 </div>
 
                 {/* 志望大学 */}
-                <div className="flex flex-wrap gap-2 mb-6 relative z-10 pointer-events-none">
+                <div className="flex flex-wrap gap-1.5 mb-3 relative z-10 pointer-events-none">
                   {student.universities.map((u, i) => (
-                    <Badge key={i} variant="secondary" className="bg-slate-50 text-slate-600 py-1.5 px-3 font-medium border-slate-100">
+                    <Badge key={i} variant="secondary" className="bg-slate-50 text-slate-600 py-1 px-2.5 font-medium border-slate-100 text-xs">
                       {u}
                     </Badge>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50 relative z-10 pointer-events-none">
+                <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50 relative z-10 pointer-events-none">
                   <span className="rounded-md border border-[#d8dee4] bg-[#eef1ea] px-3 py-1 text-xs font-semibold text-[#3346a3]">
                     {student.phase}
                   </span>

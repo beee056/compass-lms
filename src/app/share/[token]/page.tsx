@@ -31,10 +31,10 @@ export default async function SharedProgressPage({ params }: { params: { token: 
       phase: true,
       universities: { select: { name: true, department: true, method: true } },
       milestones: { select: { title: true, date: true, status: true, type: true }, orderBy: { date: "asc" } },
-      tasks: { select: { completed: true } },
+      tasks: { select: { title: true, completed: true, updatedAt: true } },
       practiceRecords: {
         where: { isArchived: false, parentRecordId: null },
-        select: { type: true, score: true, createdAt: true, questionBankId: true },
+        select: { type: true, prompt: true, score: true, createdAt: true, questionBankId: true },
         orderBy: { createdAt: "asc" }
       }
     }
@@ -50,6 +50,17 @@ export default async function SharedProgressPage({ params }: { params: { token: 
   const completedTasks = student.tasks.filter((task) => task.completed).length;
   const totalTasks = student.tasks.length;
   const upcomingMilestones = student.milestones.filter((m) => m.status !== "DONE").slice(0, 6);
+  // 「実際にどんな取り組みをしているか」が伝わるよう、直近の活動を具体的に見せる
+  // （答案・添削の本文は含めない。設問テーマと点数のみ）
+  const recentPractices = [...student.practiceRecords].reverse().slice(0, 8);
+  const recentCompletedTasks = student.tasks
+    .filter((task) => task.completed)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
+  const truncatePrompt = (value: string) => {
+    const singleLine = value.replace(/\s+/g, " ").trim();
+    return singleLine.length > 45 ? `${singleLine.slice(0, 45)}…` : singleLine;
+  };
 
   // 種別ごとの演習サマリー（回数・平均点・直近の推移）
   const kinds = ["小論文", "志望理由書", "面接"] as const;
@@ -144,6 +155,43 @@ export default async function SharedProgressPage({ params }: { params: { token: 
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {recentPractices.length > 0 && (
+          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-black text-slate-800">最近の演習の取り組み</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-400">どんなテーマに取り組んだか（答案・添削の本文は表示されません）</p>
+            <ul className="mt-3 space-y-2">
+              {recentPractices.map((record, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="mr-2 rounded-sm bg-blue-100 px-1.5 py-0.5 text-[11px] font-black text-blue-700">{record.type}</span>
+                    <span className="text-sm font-semibold text-slate-700">{truncatePrompt(record.prompt)}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-3">
+                    {record.score !== null && (
+                      <span className="text-sm font-black text-slate-800">{record.score}<span className="text-xs font-bold text-slate-400">点</span></span>
+                    )}
+                    <span className="text-xs font-semibold text-slate-400">{formatDate(record.createdAt as unknown as Date)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {recentCompletedTasks.length > 0 && (
+          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-black text-slate-800">最近完了したタスク</h2>
+            <ul className="mt-3 space-y-2">
+              {recentCompletedTasks.map((task, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 rounded-md bg-emerald-50/60 px-3 py-2">
+                  <span className="text-sm font-semibold text-slate-700">{task.title}</span>
+                  <span className="shrink-0 text-xs font-semibold text-slate-400">{formatDate(task.updatedAt as unknown as Date)}</span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

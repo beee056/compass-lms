@@ -61,6 +61,8 @@ export default function PracticeSection({
   const [questionDetails, setQuestionDetails] = useState<Record<string, QuestionDetail>>({});
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [fieldFilter, setFieldFilter] = useState("");
+  // メンターの実行モード: false=テスト（保存なし） / true=この生徒の記録として保存
+  const [mentorSaveToStudent, setMentorSaveToStudent] = useState(false);
   // 添削完了後、ダイアログを閉じずにその場で結果を表示する（スクロール位置を動かさない）
   const [dialogResult, setDialogResult] = useState<{ score: number; feedback: any; recordId?: string | null } | null>(null);
   // 面接の深掘りターン中の文脈（前の質問・回答と、保存フロー用の親記録ID）
@@ -318,14 +320,15 @@ export default function PracticeSection({
     setError(null);
     startTransition(async () => {
       const isFollowUpTurn = kind === "面接" && !!followUpContext;
+      const useInstant = isMentorView && !mentorSaveToStudent;
       const commonOptions = {
         universityName: universityName.trim() || undefined,
         charLimit: kind !== "面接" && charLimit ? parseInt(charLimit, 10) || undefined : undefined,
         questionId: !isFollowUpTurn && inputMode === "bank" && selectedQuestionId ? selectedQuestionId : undefined,
         questionTitle: bankTitle.trim() || undefined
       };
-      // メンターのテスト実行は生徒の演習記録に残さない（インスタント添削）
-      const result = isMentorView
+      // メンターは既定でテスト実行（保存なし）。「生徒の記録として保存」を選ぶと生徒の演習記録に残る
+      const result = useInstant
         ? await evaluatePracticeInstant({
             type: kind,
             promptText,
@@ -340,7 +343,7 @@ export default function PracticeSection({
             parentRecordId: isFollowUpTurn ? followUpContext!.parentRecordId ?? undefined : undefined
           });
       if (result.success && (result as any).feedback) {
-        toast.success(isMentorView ? "テスト添削が完了しました（記録には残りません）" : "AI添削が完了しました");
+        toast.success(useInstant ? "テスト添削が完了しました（記録には残りません）" : "AI添削が完了しました");
         const savedQuestion = (result as any).savedQuestion;
         if (savedQuestion) {
           toast.success(
@@ -355,7 +358,7 @@ export default function PracticeSection({
           feedback: (result as any).feedback,
           recordId: (result as any).recordId ?? null
         });
-        if (!isMentorView || savedQuestion) {
+        if (!useInstant || savedQuestion) {
           router.refresh();
         }
       } else {
@@ -438,11 +441,11 @@ export default function PracticeSection({
             </DialogTitle>
             <DialogDescription className="text-slate-500 text-sm">
               {dialogResult
-                ? isMentorView
-                  ? "テスト実行のため、この結果は生徒の演習記録には保存されていません。"
-                  : "この結果は演習記録にも保存されています。"
+                ? dialogResult.recordId
+                  ? "この結果は演習記録にも保存されています。"
+                  : "テスト実行のため、この結果は演習記録には保存されていません。"
                 : isMentorView
-                  ? "テスト実行です。結果は生徒の演習記録に残りません。"
+                  ? "既定はテスト実行（保存なし）です。下の切替で生徒の記録として保存もできます。"
                   : "設問と解答を入力すると、PIVOT&QUESTルーブリックに基づいてAIが添削します。"}
             </DialogDescription>
           </DialogHeader>
@@ -502,6 +505,30 @@ export default function PracticeSection({
             )}
 
             <div className="grid gap-5 py-2">
+              {/* メンターの実行モード切替 */}
+              {isMentorView && (
+                <div className="flex rounded-lg bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setMentorSaveToStudent(false)}
+                    className={`flex-1 rounded-md py-2 text-sm font-bold transition-all ${
+                      !mentorSaveToStudent ? "bg-white text-slate-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    テスト実行（保存しない）
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMentorSaveToStudent(true)}
+                    className={`flex-1 rounded-md py-2 text-sm font-bold transition-all ${
+                      mentorSaveToStudent ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    この生徒の記録として保存
+                  </button>
+                </div>
+              )}
+
               {/* 深掘りターン中の文脈表示 */}
               {followUpContext && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">

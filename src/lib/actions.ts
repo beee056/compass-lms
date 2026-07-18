@@ -92,6 +92,42 @@ export async function getCurrentUser() {
       }
     }
   }
+
+  // 1.6 招待メール登録より先にサインアップしてしまい、空の「メンターワークスペース」が
+  // 自動作成されたアカウントの自己修復。
+  // 自分のメールに一致する未紐付けの生徒プロフィールが別テナントにあり、かつ自分のテナントが
+  // 空（生徒0人・ユーザー自分のみ）なら、生徒アカウントへ変換して空テナントを削除する。
+  if (user && user.role === "MENTOR" && !user.studentProfile) {
+    const invitedProfile = await prisma.studentProfile.findUnique({
+      where: { studentEmail: user.email },
+      select: { id: true, tenantId: true, userId: true }
+    });
+    if (invitedProfile && !invitedProfile.userId && invitedProfile.tenantId !== user.tenantId) {
+      const [studentCount, userCount] = await Promise.all([
+        prisma.studentProfile.count({ where: { tenantId: user.tenantId } }),
+        prisma.user.count({ where: { tenantId: user.tenantId } })
+      ]);
+      if (studentCount === 0 && userCount === 1) {
+        const emptyTenantId = user.tenantId;
+        const userId2 = user.id;
+        user = await prisma.$transaction(async (tx) => {
+          await tx.user.update({
+            where: { id: userId2 },
+            data: { role: "STUDENT", tenantId: invitedProfile.tenantId }
+          });
+          await tx.studentProfile.update({
+            where: { id: invitedProfile.id },
+            data: { userId: userId2 }
+          });
+          await tx.tenant.delete({ where: { id: emptyTenantId } });
+          return tx.user.findUnique({
+            where: { id: userId2 },
+            include: { tenant: true, studentProfile: true }
+          });
+        });
+      }
+    }
+  }
   if (!user) {
     try {
       const clerkUser = await currentUser();
@@ -290,7 +326,9 @@ export async function updateStudent(studentId: string, formData: FormData) {
     await assertStudentAccess(user, studentId);
 
     const name = validateText(formData.get("name") as string, "氏名", 100);
-    const phase = validateText(formData.get("phase") as string, "フェーズ", 50);
+    // フェーズ欄は編集UIから外したため、送信がない場合は既存値を維持する
+    const phaseInput = formData.get("phase") as string | null;
+    const phase = phaseInput ? validateText(phaseInput, "フェーズ", 50) : undefined;
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
     const phone = formData.get("phone") as string || null;

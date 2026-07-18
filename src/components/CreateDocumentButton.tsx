@@ -4,7 +4,7 @@ import { toast } from "@/lib/toast";
 import { useState, useTransition } from "react";
 import { Plus, Loader2, FileText, Sparkles } from "lucide-react";
 import { createStudentDocument } from "@/lib/actions/drive";
-import { generateDocumentDraft } from "@/lib/actions/document";
+import { createBlankDocument, generateDocumentDraft } from "@/lib/actions/document";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 export default function CreateDocumentButton({ studentId, universities }: { studentId: string; universities: string[] }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [mode, setMode] = useState<"docs" | "ai">("ai");
+  const [mode, setMode] = useState<"docs" | "ai" | "blank">("blank");
   const [docType, setDocType] = useState("自己推薦書");
   const [selectedUni, setSelectedUni] = useState("共通");
   const [dueDate, setDueDate] = useState("");
@@ -28,6 +28,8 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
       let result;
       if (mode === "docs") {
         result = await createStudentDocument(studentId, docType, selectedUni, dueDate || null);
+      } else if (mode === "blank") {
+        result = await createBlankDocument(studentId, docType, selectedUni, dueDate || null);
       } else {
         result = await generateDocumentDraft(studentId, docType, selectedUni, keywords, dueDate || null);
       }
@@ -58,27 +60,44 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
 
         {/* モード切替タブ */}
         <div className="flex p-1 bg-slate-100 rounded-lg mb-4">
-          <button 
+          <button
+            type="button"
+            onClick={() => setMode("blank")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-bold rounded-md transition-all ${
+              mode === "blank" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            空白から作成
+          </button>
+          <button
             type="button"
             onClick={() => setMode("ai")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-bold rounded-md transition-all ${
               mode === "ai" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <Sparkles className="h-4 w-4" />
-            アプリ内作成（AIアシスト）
+            AIドラフト
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => setMode("docs")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-bold rounded-md transition-all ${
               mode === "docs" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <FileText className="h-4 w-4" />
-            Google Docs（空ファイル）
+            Google Docs
           </button>
         </div>
+        <p className="mb-2 -mt-2 text-xs font-medium text-slate-400">
+          {mode === "blank"
+            ? "アプリ内エディタで白紙から書き始めます。"
+            : mode === "ai"
+              ? "入力したポイントをもとにAIが初稿を作成し、アプリ内エディタで編集できます。"
+              : "Google Driveに空のドキュメントを作成してリンクします。"}
+        </p>
 
         <form onSubmit={handleCreate}>
           <div className="grid gap-4 py-2">
@@ -158,8 +177,12 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   {mode === "ai" ? "AIで作成中..." : "作成中..."}
                 </>
+              ) : mode === "ai" ? (
+                "AIドラフトを作成"
+              ) : mode === "blank" ? (
+                "空白ドキュメントを作成"
               ) : (
-                mode === "ai" ? "AIドラフトを作成" : "Google Docsを作成"
+                "Google Docsを作成"
               )}
             </Button>
           </DialogFooter>

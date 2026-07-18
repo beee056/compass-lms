@@ -2,13 +2,10 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CalendarDays,
-  CheckCircle2,
   Clock,
   FileText,
   GraduationCap,
   MessageSquare,
-  PenTool,
-  Route,
   Target,
   UsersRound,
   type LucideIcon
@@ -75,8 +72,6 @@ interface MetricCardProps {
   tone: string;
 }
 
-const phaseOrder = ["自己分析", "書類作成", "活動報告", "面接対策", "最終確認"] as const;
-
 const riskStyles = {
   critical: {
     label: "要介入",
@@ -105,28 +100,6 @@ function getRisk(value: Date | string | null | undefined): keyof typeof riskStyl
   if (days <= 1) return "critical";
   if (days <= 5) return "watch";
   return "steady";
-}
-
-function getPhaseIndex(phase: string): number {
-  const normalizedPhase = phase || "";
-  const foundIndex = phaseOrder.findIndex((item) => normalizedPhase.includes(item.replace("対策", "")));
-  return foundIndex >= 0 ? foundIndex : 0;
-}
-
-function getPhaseProgress(phase: string): number {
-  return Math.min(95, 20 + getPhaseIndex(phase) * 18);
-}
-
-function getRouteState(index: number, activeIndex: number): string {
-  if (index < activeIndex) return "完了";
-  if (index === activeIndex) return "進行中";
-  return "待機";
-}
-
-function getRouteTone(index: number, activeIndex: number): string {
-  if (index < activeIndex) return "bg-[#137a5b] text-white border-[#137a5b]";
-  if (index === activeIndex) return "bg-[#3346a3] text-white border-[#3346a3]";
-  return "bg-white text-[#17202a] border-[#d8dee4]";
 }
 
 function MetricCard({ label, value, detail, icon: Icon, tone }: MetricCardProps) {
@@ -163,8 +136,6 @@ export default function MentorCommandCenter({
     activeStudents.find((student) =>
       upcomingTasks.some((task) => task.studentProfileId === student.id)
     ) ?? activeStudents[0];
-  const activePhaseIndex = selectedStudent ? getPhaseIndex(selectedStudent.phase) : 0;
-  const selectedProgress = selectedStudent ? getPhaseProgress(selectedStudent.phase) : 0;
 
   // Phase 3: 停滞している生徒（7日以上活動なし）と、メンターの返信待ちタスク
   const stalledStudents = activeStudents
@@ -326,15 +297,9 @@ export default function MentorCommandCenter({
           {selectedStudent ? (
             <div className="mt-5 space-y-4">
               <div className="rounded-lg border border-white/15 bg-white/5 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-bold text-white/70">{selectedStudent.phase}</span>
-                  <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-white/75">
-                    {selectedProgress}%
-                  </span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-sm bg-white/10">
-                  <div className="h-full bg-[#f5c04f]" style={{ width: `${selectedProgress}%` }} />
-                </div>
+                <span className="rounded-md bg-white/10 px-2.5 py-1 text-xs font-black text-white/80">
+                  {selectedStudent.phase}
+                </span>
                 <p className="mt-3 text-sm leading-6 text-white/70">
                   {selectedStudent.universities[0] ?? "志望校未設定"}
                 </p>
@@ -356,7 +321,7 @@ export default function MentorCommandCenter({
         </aside>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.35fr_0.75fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         <div className="rounded-lg border border-[#d8dee4] bg-white">
           <div className="border-b border-[#d8dee4] px-5 py-4">
             <h2 className="flex items-center gap-2 text-lg font-black">
@@ -405,172 +370,31 @@ export default function MentorCommandCenter({
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#d8dee4] bg-[#fbfcf8] p-5">
-          <div className="flex items-center justify-between gap-4">
+        <div className="rounded-lg border border-[#d8dee4] bg-white">
+          <div className="flex items-center justify-between border-b border-[#d8dee4] px-5 py-4">
             <h2 className="flex items-center gap-2 text-lg font-black">
-              <Route className="h-5 w-5 text-[#3346a3]" />
-              出願航路
+              <CalendarDays className="h-5 w-5 text-[#137a5b]" />
+              直近のマイルストーン
             </h2>
-            <span className="rounded-md bg-white px-3 py-1 text-xs font-bold text-slate-500 ring-1 ring-[#d8dee4]">
-              {selectedStudent?.name ?? "生徒未選択"}
-            </span>
+            <Link href="/schedule" className="text-xs font-bold text-[#3346a3] hover:underline">
+              全体スケジュールへ
+            </Link>
           </div>
-
-          <div className="relative mt-6">
-            <div className="absolute left-8 right-8 top-8 hidden h-1 bg-[#d8dee4] md:block" />
-            <div className="grid gap-4 md:grid-cols-5">
-              {phaseOrder.map((phase, index) => (
-                <article key={phase} className="relative rounded-lg border border-[#d8dee4] bg-white p-4">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-lg border text-sm font-black ${getRouteTone(index, activePhaseIndex)}`}>
-                    {index < activePhaseIndex ? <CheckCircle2 className="h-5 w-5" /> : index + 1}
-                  </div>
-                  <p className="mt-4 text-xs font-black text-[#3346a3]">STEP {index + 1}</p>
-                  <h3 className="mt-1 whitespace-nowrap text-sm font-black">{phase}</h3>
-                  <p className="mt-3 rounded-md bg-[#eef1ea] px-2 py-1 text-xs font-black text-[#17202a]">
-                    {getRouteState(index, activePhaseIndex)}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="divide-y divide-[#eef1ea]">
             {upcomingMilestones.length === 0 ? (
-              <div className="rounded-lg border border-[#d8dee4] bg-white p-4 md:col-span-3">
-                <p className="text-sm font-semibold text-slate-500">直近のマイルストーンはありません。</p>
-              </div>
+              <div className="p-5 text-sm font-semibold text-slate-500">直近のマイルストーンはありません。</div>
             ) : (
               upcomingMilestones.map((milestone) => (
-                <div key={milestone.id} className="rounded-lg border border-[#d8dee4] bg-white p-4">
+                <div key={milestone.id} className="p-4">
                   <p className="text-xs font-bold text-slate-500">{formatDate(milestone.date)}</p>
-                  <p className="mt-2 line-clamp-2 text-sm font-black">{milestone.title}</p>
-                  <p className="mt-2 text-xs font-bold text-[#3346a3]">
+                  <p className="mt-1 line-clamp-2 text-sm font-black">{milestone.title}</p>
+                  <p className="mt-1 text-xs font-bold text-[#3346a3]">
                     {milestone.studentProfile?.name ?? milestone.type}
                   </p>
                 </div>
               ))
             )}
           </div>
-        </div>
-
-        <div className="rounded-lg border border-[#d8dee4] bg-white">
-          <div className="border-b border-[#d8dee4] px-5 py-4">
-            <h2 className="text-lg font-black">生徒ポートフォリオ</h2>
-          </div>
-          <div className="divide-y divide-[#eef1ea]">
-            {activeStudents.slice(0, 5).map((student) => {
-              const progress = getPhaseProgress(student.phase);
-              return (
-                <Link
-                  key={student.id}
-                  href={`/students/${student.id}`}
-                  className="block p-4 transition-colors hover:bg-[#fbfcf8]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-black">{student.name}</p>
-                      <p className="mt-1 text-xs font-bold text-slate-500">{student.phase}</p>
-                    </div>
-                    <span className="rounded-md bg-[#eef9f5] px-2 py-1 text-xs font-black text-[#0f684d]">
-                      {progress}%
-                    </span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-sm bg-[#eef1ea]">
-                    <div className="h-full bg-[#3346a3]" style={{ width: `${progress}%` }} />
-                  </div>
-                  <p className="mt-3 truncate text-xs font-bold text-slate-500">
-                    {student.universities[0] ?? "志望校未設定"}
-                  </p>
-                </Link>
-              );
-            })}
-            {activeStudents.length === 0 && (
-              <div className="p-5 text-sm font-semibold leading-6 text-slate-500">
-                在籍生がまだ登録されていません。
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-lg border border-[#d8dee4] bg-white">
-          <div className="border-b border-[#d8dee4] px-5 py-4">
-            <h2 className="flex items-center gap-2 text-lg font-black">
-              <FileText className="h-5 w-5 text-[#3346a3]" />
-              直近の提出物
-            </h2>
-          </div>
-          <div className="divide-y divide-[#eef1ea]">
-            {upcomingTasks.slice(0, 3).map((task) => (
-              <Link
-                key={task.id}
-                href={`/students/${task.studentProfileId}`}
-                className="flex items-center justify-between gap-4 p-5 transition-colors hover:bg-[#fbfcf8]"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="rounded-md bg-[#eef1ea] p-2 text-[#3346a3]">
-                    <PenTool className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="font-black">{task.title}</p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {task.studentProfile?.name ?? "生徒名未設定"}
-                    </p>
-                  </div>
-                </div>
-                <span className="shrink-0 rounded-md bg-[#fbfcf8] px-2 py-1 text-xs font-black text-[#17202a] ring-1 ring-[#d8dee4]">
-                  {getRelativeDueLabel(task.dueDate)}
-                </span>
-              </Link>
-            ))}
-            {upcomingTasks.length === 0 && (
-              <div className="p-5 text-sm font-semibold text-slate-500">提出物タスクはありません。</div>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-[#d8dee4] bg-[#17202a] p-5 text-white">
-          <h2 className="flex items-center gap-2 text-lg font-black">
-            <MessageSquare className="h-5 w-5 text-[#f5c04f]" />
-            次回面談の視点
-          </h2>
-          <div className="mt-5 space-y-3">
-            {[
-              "期限が近いタスクから、文章添削より構造レビューを優先する",
-              "志望校ごとの根拠が弱い生徒を先に見る",
-              "面談後はタスクとマイルストーンを同時に更新する"
-            ].map((item) => (
-              <div key={item} className="flex items-start gap-3 rounded-lg border border-white/15 bg-white/5 p-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 text-[#f5c04f]" />
-                <span className="text-sm font-bold leading-6 text-white/80">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-[#d8dee4] bg-white p-5">
-          <h2 className="flex items-center gap-2 text-lg font-black">
-            <CalendarDays className="h-5 w-5 text-[#137a5b]" />
-            本日の運用
-          </h2>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-[#fbfcf8] p-4 ring-1 ring-[#d8dee4]">
-              <p className="text-xs font-bold text-slate-500">停滞生徒</p>
-              <p className="mt-2 text-2xl font-black">{stalledStudents.length}</p>
-            </div>
-            <div className="rounded-lg bg-[#fbfcf8] p-4 ring-1 ring-[#d8dee4]">
-              <p className="text-xs font-bold text-slate-500">返信待ち</p>
-              <p className="mt-2 text-2xl font-black">{replyNeededTasks.length}</p>
-            </div>
-          </div>
-          <Link
-            href="/schedule"
-            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#d8dee4] bg-[#fbfcf8] text-sm font-black text-[#17202a] transition-colors hover:border-[#137a5b] hover:text-[#137a5b]"
-          >
-            全体スケジュールへ
-            <CalendarDays className="h-4 w-4" />
-          </Link>
         </div>
       </section>
 

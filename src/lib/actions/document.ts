@@ -87,6 +87,57 @@ ${keywords}
   }
 }
 
+// アプリ内エディタ用の空白ドキュメントを作成する（AIドラフトなし）
+export async function createBlankDocument(
+  studentId: string,
+  type: string,
+  universityName: string,
+  dueDateStr?: string | null
+) {
+  try {
+    const user = await getCurrentUser();
+    assertMentor(user);
+    await assertStudentAccess(user, studentId);
+
+    const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
+    if (!student) throw new Error("Student not found");
+
+    const parsedDueDate = dueDateStr ? endOfDayJST(dueDateStr) : null;
+    const title = universityName && universityName !== "共通" ? `【${universityName}】${type}` : type;
+
+    const newDoc = await prisma.document.create({
+      data: {
+        id: `doc-${randomUUID()}`,
+        studentProfileId: studentId,
+        title,
+        type,
+        dueDate: parsedDueDate,
+        content: "",
+        isInternal: true,
+        url: null
+      }
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        id: `log-${randomUUID()}`,
+        tenantId: student.tenantId || "default_tenant",
+        studentProfileId: student.id,
+        action: "DOCUMENT_ADDED",
+        details: `「${newDoc.title}」を作成しました。`
+      }
+    });
+
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath(`/portal`);
+
+    return { success: true, documentId: newDoc.id };
+  } catch (error: any) {
+    console.error("Blank document creation failed:", error);
+    return { success: false, error: toClientError(error, "ドキュメントの作成に失敗しました") };
+  }
+}
+
 export async function updateDocumentContent(documentId: string, content: string) {
   try {
     const user = await getCurrentUser();

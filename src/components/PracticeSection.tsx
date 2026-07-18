@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { evaluatePracticeInstant, evaluateWithRubric, generatePracticeQuestion } from "@/lib/actions/ai";
+import { setPracticeRecordArchived } from "@/lib/actions/practice-records";
 import { RUBRICS, type PracticeKind } from "@/lib/rubrics";
 import { getInterviewMainQuestion, getInterviewResponseMetrics, inferCharLimit } from "@/lib/practice-evaluation";
 import { isStructuredPracticeFeedback } from "@/lib/practice-feedback";
@@ -71,8 +72,22 @@ export default function PracticeSection({
   const [genTheme, setGenTheme] = useState("");
 
   const router = useRouter();
+  const [archivingId, setArchivingId] = useState<string | null>(null);
   // router.refresh()でサーバーから渡し直される最新値をそのまま使う（stateに固定しない）
   const records = initialRecords || [];
+
+  // 同じ問題（questionBankId）への挑戦履歴を古い順に束ねる（スコア推移表示用）
+  const attemptsByQuestion = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const record of initialRecords || []) {
+      if (!record.questionBankId) continue;
+      (map[record.questionBankId] ??= []).push(record);
+    }
+    for (const list of Object.values(map)) {
+      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+    return map;
+  }, [initialRecords]);
 
   const rubric = RUBRICS[kind];
   const interviewMetrics = kind === "面接" ? getInterviewResponseMetrics(answer) : null;
@@ -163,6 +178,37 @@ export default function PracticeSection({
   const handleDialogOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) resetPracticeForm();
+  };
+
+  // 過去の記録から、同じ設問で解答を編集して再提出する
+  const handleResubmit = (record: any) => {
+    resetPracticeForm();
+    const recordKind = KIND_OPTIONS.includes(record.type) ? (record.type as PracticeKind) : "志望理由書";
+    setKind(recordKind);
+    if (record.questionBankId && questionBank.some((q) => q.id === record.questionBankId)) {
+      setInputMode("bank");
+      void handleBankSelect(record.questionBankId);
+    } else {
+      setInputMode("custom");
+      setPromptText(record.prompt ?? "");
+    }
+    setAnswer(record.answer ?? "");
+    setOpen(true);
+  };
+
+  const handleArchiveRecord = (record: any) => {
+    if (!window.confirm("この記録を非表示にしますか？（データは削除されません）")) return;
+    setArchivingId(record.id);
+    startTransition(async () => {
+      const result = await setPracticeRecordArchived(record.id, true);
+      setArchivingId(null);
+      if (result.success) {
+        toast.success("記録を非表示にしました");
+        router.refresh();
+      } else {
+        toast.error(result.error ?? "操作に失敗しました");
+      }
+    });
   };
 
   // 教材ライブラリ等から ?practiceQuestion=<id> で遷移した場合、その問題を選択した状態で開く。
@@ -671,6 +717,9 @@ export default function PracticeSection({
           records.map((record, recordIndex) => {
             const feedback = parseFeedback(record.feedback);
             const isV2 = isStructuredPracticeFeedback(feedback);
+            const attempts = record.questionBankId ? attemptsByQuestion[record.questionBankId] ?? [] : [];
+            const attemptNumber = attempts.findIndex((a) => a.id === record.id) + 1;
+            const scoreTrend = attempts.length > 1 ? attempts.map((a) => a.score ?? "-").join(" → ") : null;
             return (
               <Card key={record.id} className="border-slate-200/60 shadow-sm overflow-hidden bg-white">
                 <details open={recordIndex === 0} className="group/record">
@@ -689,6 +738,11 @@ export default function PracticeSection({
                       {isV2 && feedback.universityProfile?.label && (
                         <span className="text-xs py-0.5 px-2 bg-violet-100 text-violet-700 font-bold rounded-sm">
                           {feedback.universityProfile.label}
+                        </span>
+                      )}
+                      {attemptNumber > 0 && attempts.length > 1 && (
+                        <span className="text-xs py-0.5 px-2 bg-emerald-50 text-emerald-700 font-bold rounded-sm border border-emerald-200">
+                          挑戦{attemptNumber}回目（{scoreTrend}点）
                         </span>
                       )}
                       <span className="text-xs text-slate-400 font-medium">
@@ -727,6 +781,26 @@ export default function PracticeSection({
                     </div>
                   </div>
                 </details>
+
+                <div className="mx-5 mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleResubmit(record)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                  >
+                    <PenTool className="h-3.5 w-3.5" />
+                    この解答を編集して再提出
+                  </button>
+                  <button
+                    type="button"
+                    disabled={archivingId === record.id}
+                    onClick={() => handleArchiveRecord(record)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {archivingId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    記録を非表示にする
+                  </button>
+                </div>
 
                 {isV2 ? (
                   <div className="p-5">

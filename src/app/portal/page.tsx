@@ -37,7 +37,7 @@ export default async function StudentPortalPage() {
       documents: { orderBy: { updatedAt: 'desc' } },
       tasks: { orderBy: { dueDate: 'asc' } },
       milestones: { orderBy: { date: 'asc' } },
-      practiceRecords: { orderBy: { createdAt: 'desc' } }
+      practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } }
     }
   });
 

@@ -51,7 +51,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
           orderBy: { dueDate: 'asc' }
         },
         milestones: { orderBy: { date: 'asc' } },
-        practiceRecords: { orderBy: { createdAt: 'desc' } }
+        practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } }
       }
     }),
     getTemplates(),

@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "./prisma";
 import { sendAuthEmail } from "./auth-email";
+import { provisionUser } from "./provision";
 
 // Better Auth サーバー設定。
 // - email/password 認証（サインアップ時はメール確認必須）
@@ -57,6 +58,18 @@ export const auth = betterAuth({
       role: { type: "string", required: false, defaultValue: "MENTOR", input: false },
       isOperator: { type: "boolean", required: false, defaultValue: false, input: false },
       tenantId: { type: "string", required: false, input: false }
+    }
+  },
+
+  // サインアップ直後に一度だけプロビジョニング（テナント紐付け）を実行する。
+  // getCurrentUser 側の並行実行によるテナント重複作成を避けるため、ここで確定させる。
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await provisionUser({ id: user.id, email: user.email, name: user.name });
+        }
+      }
     }
   }
 });

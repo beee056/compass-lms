@@ -15,8 +15,9 @@ model Tenant {
   status           String           @default("ACTIVE")
   approvedAt       DateTime?
   approvedByUserId String?
-  // Clerk→Better Auth 移行用: 再登録時に既存ワークスペースを再取得するためのオーナーメール
-  ownerEmail       String?
+  // Clerk→Better Auth 移行用: 再登録時に既存ワークスペースを再取得するためのオーナーメール。
+  // 一意制約により、並行プロビジョニング時のテナント重複作成を防ぐ（1オーナー=1ワークスペース）
+  ownerEmail       String?          @unique
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   users            User[]

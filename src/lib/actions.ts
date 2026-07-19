@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { auth } from "./auth";
+import { provisionUser } from "./provision";
 import prisma from "./prisma";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "./email";
@@ -84,46 +85,13 @@ export async function getCurrentUser() {
   });
   if (!user) throw new Error("ユーザーレコードが見つかりません");
 
-  // プロビジョニング: tenantId 未設定（初回アクセス）ならテナント紐付けを確定する。
-  // 1) 招待済み生徒 → その塾のSTUDENT / 2) 既存ワークスペースのオーナー（移行含む） → MENTOR /
-  // 3) いずれでもない → 新規ワークスペース作成（既定は承認待ち）
+  // プロビジョニングは本来サインアップ時のフックで完了しているが、万一未確定の場合の
+  // フォールバック。provisionUserは冪等かつ並行安全（ownerEmail一意制約で重複防止）。
   if (!user.tenantId) {
-    const provisionedId = user.id;
-    user = await prisma.$transaction(async (tx) => {
-      const invitedProfile = await tx.studentProfile.findUnique({
-        where: { studentEmail: email },
-        select: { id: true, name: true, tenantId: true, userId: true }
-      });
-      if (invitedProfile && !invitedProfile.userId) {
-        await tx.studentProfile.update({ where: { id: invitedProfile.id }, data: { userId: provisionedId } });
-        await tx.user.update({
-          where: { id: provisionedId },
-          data: { role: "STUDENT", tenantId: invitedProfile.tenantId, name: invitedProfile.name }
-        });
-        return tx.user.findUnique({ where: { id: provisionedId }, include: { tenant: true, studentProfile: true } });
-      }
-
-      // 既存ワークスペースのオーナー（Clerk時代のメンター等）を再取得
-      const ownedTenant = await tx.tenant.findFirst({
-        where: { ownerEmail: email },
-        select: { id: true }
-      });
-      if (ownedTenant) {
-        await tx.user.update({ where: { id: provisionedId }, data: { role: "MENTOR", tenantId: ownedTenant.id } });
-        return tx.user.findUnique({ where: { id: provisionedId }, include: { tenant: true, studentProfile: true } });
-      }
-
-      // 新規メンターとしてワークスペース作成（承認制）
-      const tenant = await tx.tenant.create({
-        data: {
-          id: generateId("tenant"),
-          name: `${user!.name || "メンター"}のワークスペース`,
-          status: process.env.TENANT_AUTO_APPROVE === "true" ? "ACTIVE" : "PENDING",
-          ownerEmail: email
-        }
-      });
-      await tx.user.update({ where: { id: provisionedId }, data: { role: "MENTOR", tenantId: tenant.id } });
-      return tx.user.findUnique({ where: { id: provisionedId }, include: { tenant: true, studentProfile: true } });
+    await provisionUser({ id: user.id, email, name: user.name });
+    user = await prisma.user.findUnique({
+      where: { id: authUserId },
+      include: { tenant: true, studentProfile: true }
     });
   }
   if (!user) throw new Error("Unauthorized");

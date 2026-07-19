@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import {
   AlertTriangle,
   BookOpen,
@@ -136,7 +136,8 @@ function MetricCard({ label, value, detail, icon: Icon, tone }: MetricCardProps)
 }
 
 export default async function PublicDemoPage() {
-  const { userId } = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
+  const userId = session?.user?.id ?? null;
   return (
     <div className="space-y-10 pb-16 text-[#17202a]">
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -165,17 +166,13 @@ export default async function PublicDemoPage() {
               </Link>
             ) : (
               <div className="flex items-center gap-2">
-                <SignInButton mode="modal">
-                  <button className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d8dee4] bg-white px-4 text-sm font-bold text-[#17202a] transition-colors hover:border-[#3346a3] hover:text-[#3346a3]">
-                    ログイン
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3346a3] px-4 text-sm font-black text-white transition-colors hover:bg-[#2a3a8c]">
-                    <Sparkles className="h-4 w-4" />
-                    無料で始める
-                  </button>
-                </SignUpButton>
+                <Link href="/sign-in" className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d8dee4] bg-white px-4 text-sm font-bold text-[#17202a] transition-colors hover:border-[#3346a3] hover:text-[#3346a3]">
+                  ログイン
+                </Link>
+                <Link href="/sign-up" className="inline-flex h-10 items-center gap-2 rounded-md bg-[#3346a3] px-4 text-sm font-black text-white transition-colors hover:bg-[#2a3a8c]">
+                  <Sparkles className="h-4 w-4" />
+                  無料で始める
+                </Link>
               </div>
             )}
           </div>

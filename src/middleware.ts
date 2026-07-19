@@ -1,20 +1,36 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { getSessionCookie } from "better-auth/cookies";
 
-const isPublicRoute = createRouteMatcher([
-  "/demo(.*)",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks(.*)",
-  // Vercel Cron からの呼び出し（CRON_SECRET の Bearer 認証をルート内で実施）
-  "/api/cron(.*)",
-  // 保護者向け閲覧専用リンク（推測不能トークンでルート内認可）
-  "/share(.*)"
-]);
+// 公開ルート（未ログインでもアクセス可）
+const PUBLIC_PATHS = [
+  "/demo",
+  "/sign-in",
+  "/sign-up",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/share", // 保護者向け閲覧専用リンク（トークンでルート内認可）
+  "/api/auth", // Better Auth エンドポイント
+  "/api/cron" // Vercel Cron（ルート内でBearer認証）
+];
 
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) await auth.protect();
-});
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (isPublic(pathname)) return NextResponse.next();
+
+  // セッションクッキーの有無だけを軽量にチェック（詳細な検証は各ページ/アクションのgetCurrentUserで実施）
+  const sessionCookie = getSessionCookie(request);
+  if (!sessionCookie) {
+    const signInUrl = new URL("/sign-in", request.url);
+    return NextResponse.redirect(signInUrl);
+  }
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: ["/((?!_next|.*\\..*).*)"]
 };

@@ -1,6 +1,7 @@
 "use server";
 
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
+import { auth } from "./auth";
 import prisma from "./prisma";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "./email";
@@ -70,159 +71,72 @@ function parseDayStart(dateStr: string): Date {
 
 // ヘルパー関数: 現在のユーザーとテナントIDを取得する
 export async function getCurrentUser() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  // Better Auth のセッションから本人を特定する
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new Error("Unauthorized");
+  const authUserId = session.user.id;
+  const email = session.user.email;
 
-  // 1. まず既存のユーザーを検索
+  // Better Auth が作成済みのUser行を取得（サインアップ時に必ず存在する）
   let user = await prisma.user.findUnique({
-    where: { clerkId: userId },
+    where: { id: authUserId },
     include: { tenant: true, studentProfile: true }
   });
+  if (!user) throw new Error("ユーザーレコードが見つかりません");
 
-  // 1.5 既存ユーザーがSTUDENTなのにプロフィールがない場合の自己修復（管理者が再作成したケースなど）
-  if (user && user.role === "STUDENT" && !user.studentProfile) {
-    const clerkUser = await currentUser();
-    const email = clerkUser?.emailAddresses[0]?.emailAddress;
-    if (email) {
-      const profile = await prisma.studentProfile.findUnique({ where: { studentEmail: email } });
-      if (profile && !profile.userId) {
-        await prisma.studentProfile.update({
-          where: { id: profile.id },
-          data: { userId: user.id }
+  // プロビジョニング: tenantId 未設定（初回アクセス）ならテナント紐付けを確定する。
+  // 1) 招待済み生徒 → その塾のSTUDENT / 2) 既存ワークスペースのオーナー（移行含む） → MENTOR /
+  // 3) いずれでもない → 新規ワークスペース作成（既定は承認待ち）
+  if (!user.tenantId) {
+    const provisionedId = user.id;
+    user = await prisma.$transaction(async (tx) => {
+      const invitedProfile = await tx.studentProfile.findUnique({
+        where: { studentEmail: email },
+        select: { id: true, name: true, tenantId: true, userId: true }
+      });
+      if (invitedProfile && !invitedProfile.userId) {
+        await tx.studentProfile.update({ where: { id: invitedProfile.id }, data: { userId: provisionedId } });
+        await tx.user.update({
+          where: { id: provisionedId },
+          data: { role: "STUDENT", tenantId: invitedProfile.tenantId, name: invitedProfile.name }
         });
+        return tx.user.findUnique({ where: { id: provisionedId }, include: { tenant: true, studentProfile: true } });
       }
-    }
-  }
 
-  // 1.6 招待メール登録より先にサインアップしてしまい、空の「メンターワークスペース」が
-  // 自動作成されたアカウントの自己修復。
-  // 自分のメールに一致する未紐付けの生徒プロフィールが別テナントにあり、かつ自分のテナントが
-  // 空（生徒0人・ユーザー自分のみ）なら、生徒アカウントへ変換して空テナントを削除する。
-  if (user && user.role === "MENTOR" && !user.studentProfile) {
-    const invitedProfile = await prisma.studentProfile.findUnique({
-      where: { studentEmail: user.email },
-      select: { id: true, name: true, tenantId: true, userId: true }
+      // 既存ワークスペースのオーナー（Clerk時代のメンター等）を再取得
+      const ownedTenant = await tx.tenant.findFirst({
+        where: { ownerEmail: email },
+        select: { id: true }
+      });
+      if (ownedTenant) {
+        await tx.user.update({ where: { id: provisionedId }, data: { role: "MENTOR", tenantId: ownedTenant.id } });
+        return tx.user.findUnique({ where: { id: provisionedId }, include: { tenant: true, studentProfile: true } });
+      }
+
+      // 新規メンターとしてワークスペース作成（承認制）
+      const tenant = await tx.tenant.create({
+        data: {
+          id: generateId("tenant"),
+          name: `${user!.name || "メンター"}のワークスペース`,
+          status: process.env.TENANT_AUTO_APPROVE === "true" ? "ACTIVE" : "PENDING",
+          ownerEmail: email
+        }
+      });
+      await tx.user.update({ where: { id: provisionedId }, data: { role: "MENTOR", tenantId: tenant.id } });
+      return tx.user.findUnique({ where: { id: provisionedId }, include: { tenant: true, studentProfile: true } });
     });
-    if (invitedProfile && !invitedProfile.userId && invitedProfile.tenantId !== user.tenantId) {
-      const [studentCount, userCount] = await Promise.all([
-        prisma.studentProfile.count({ where: { tenantId: user.tenantId } }),
-        prisma.user.count({ where: { tenantId: user.tenantId } })
-      ]);
-      if (studentCount === 0 && userCount === 1) {
-        const emptyTenantId = user.tenantId;
-        const userId2 = user.id;
-        user = await prisma.$transaction(async (tx) => {
-          await tx.user.update({
-            where: { id: userId2 },
-            data: { role: "STUDENT", tenantId: invitedProfile.tenantId, name: invitedProfile.name }
-          });
-          await tx.studentProfile.update({
-            where: { id: invitedProfile.id },
-            data: { userId: userId2 }
-          });
-          await tx.tenant.delete({ where: { id: emptyTenantId } });
-          return tx.user.findUnique({
-            where: { id: userId2 },
-            include: { tenant: true, studentProfile: true }
-          });
-        });
-      }
-    }
   }
-  if (!user) {
-    try {
-      const clerkUser = await currentUser();
-      if (!clerkUser) throw new Error("Clerk user session not found");
-
-      const email = clerkUser.emailAddresses[0]?.emailAddress;
-      if (!email) throw new Error("User email not found in Clerk");
-
-      const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || clerkUser.username || "メンター";
-
-      user = await prisma.$transaction(async (tx) => {
-        // 二重チェック
-        const existing = await tx.user.findUnique({
-          where: { clerkId: userId },
-          include: { tenant: true, studentProfile: true }
-        });
-        if (existing) return existing;
-
-        // 同じメールの既存ユーザーがいれば、clerkIdを付け替えて再リンクする。
-        // （Clerkのdev→productionインスタンス切替や、Clerk側でアカウントを作り直した場合、
-        //   clerkIdは変わるがメールは同じ。メールはClerkがサインアップ時に検証済み）
-        const existingByEmail = await tx.user.findUnique({ where: { email } });
-        if (existingByEmail) {
-          return await tx.user.update({
-            where: { id: existingByEmail.id },
-            data: { clerkId: userId },
-            include: { tenant: true, studentProfile: true }
-          });
-        }
-
-        // 生徒として招待されているか確認
-        const studentProfile = email ? await tx.studentProfile.findUnique({ where: { studentEmail: email } }) : null;
-
-        if (studentProfile) {
-          // 生徒として登録
-          const newUser = await tx.user.create({
-            data: {
-              id: generateId('user'),
-              clerkId: userId,
-              tenantId: studentProfile.tenantId,
-              role: "STUDENT",
-              name,
-              email
-            },
-            include: { tenant: true, studentProfile: true }
-          });
-          // StudentProfile側にも紐付け
-          await tx.studentProfile.update({
-            where: { id: studentProfile.id },
-            data: { userId: newUser.id }
-          });
-          return newUser;
-        } else {
-          // メンターとして新規テナント作成（既定は承認待ち。運営者が/adminで承認するまで利用制限）
-          const tenant = await tx.tenant.create({
-            data: {
-              id: generateId('tenant'),
-              name: `${name}のワークスペース`,
-              status: process.env.TENANT_AUTO_APPROVE === "true" ? "ACTIVE" : "PENDING"
-            }
-          });
-
-          // ユーザーを作成
-          return await tx.user.create({
-            data: {
-              id: generateId('user'),
-              clerkId: userId,
-              tenantId: tenant.id,
-              role: "MENTOR",
-              name,
-              email
-            },
-            include: { tenant: true, studentProfile: true }
-          });
-        }
-      });
-    } catch (dbError: any) {
-      console.error("Failed in on-demand provisioning transaction:", dbError);
-      
-      // 万が一、競合して別プロセスで作成された場合などに備えて、もう一度引き直す
-      user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        include: { tenant: true, studentProfile: true }
-      });
-
-      if (!user) {
-        throw new Error(`ユーザーの同期中にエラーが発生しました: ${dbError.message}`);
-      }
-    }
-  }
-
-  // ここに到達して user が null なのは想定外（上のロジックで必ず生成/取得される）。
-  // 返り値の型を非nullに確定させ、呼び出し側(assertMentor等)の型エラーを防ぐ。
   if (!user) throw new Error("Unauthorized");
+  // プロビジョニング後はテナントが必ず確定している
+  if (!user.tenantId) throw new Error("ワークスペースの割り当てに失敗しました");
+
+  // 生徒なのにプロフィール未リンクの場合の自己修復（招待メールが後から一致したケース）
+  if (user.role === "STUDENT" && !user.studentProfile) {
+    const profile = await prisma.studentProfile.findUnique({ where: { studentEmail: email } });
+    if (profile && !profile.userId) {
+      await prisma.studentProfile.update({ where: { id: profile.id }, data: { userId: user.id } });
+    }
+  }
 
   // 運営者フラグは環境変数OPERATOR_EMAILSと同期する（envが唯一の真実源。UIからの任命機能は作らない）
   const operatorEmails = (process.env.OPERATOR_EMAILS ?? "")
@@ -245,7 +159,8 @@ export async function getCurrentUser() {
     }
   }
 
-  return user;
+  // tenantId は上のガードで非nullが保証されるため、downstream向けに型を確定させる
+  return user as typeof user & { tenantId: string };
 }
 
 export async function getStudents() {

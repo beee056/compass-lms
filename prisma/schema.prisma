@@ -15,6 +15,8 @@ model Tenant {
   status           String           @default("ACTIVE")
   approvedAt       DateTime?
   approvedByUserId String?
+  // Clerk→Better Auth 移行用: 再登録時に既存ワークスペースを再取得するためのオーナーメール
+  ownerEmail       String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   users            User[]
@@ -25,20 +27,75 @@ model Tenant {
 
 model User {
   id             String          @id @default(cuid())
-  clerkId        String          @unique
-  tenantId       String
-  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  // 旧Clerk識別子。移行期間中は残置し、完全移行後に削除する（nullable化済み）
+  clerkId        String?         @unique
+  // Better Auth のテナント紐付け。プロビジョニング前は一時的にnull
+  tenantId       String?
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
   role           String          @default("MENTOR") // "STUDENT", "MENTOR", "ADMIN"
   // 運営者フラグ。環境変数OPERATOR_EMAILSと同期され、/admin配下でのみ横断権限が効く
   isOperator     Boolean         @default(false)
   name           String
   email          String          @unique
+  // Better Auth 必須フィールド
+  emailVerified  Boolean         @default(false)
+  image          String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   // 生徒本人のログインアカウント（1:1）
   studentProfile StudentProfile? @relation("StudentLogin")
+  // Better Auth リレーション
+  sessions       Session[]
+  accounts       Account[]
 
   @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Better Auth 管理テーブル（session / account / verification）
+// ---------------------------------------------------------------------------
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId             String
+  providerId            String
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?   @db.Text // email/password のハッシュ
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
 }
 
 model StudentProfile {

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/lib/toast";
 import "./globals.css";
 import Header from "@/components/layout/Header";
@@ -48,16 +47,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="ja">
-        <body className={`${inter.variable} ${headingFont.variable} font-sans antialiased bg-background min-h-screen flex flex-col overflow-x-hidden`}>
-          <Header />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {children}
-          </main>
-          <Toaster />
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="ja">
+      <body className={`${inter.variable} ${headingFont.variable} font-sans antialiased bg-background min-h-screen flex flex-col overflow-x-hidden`}>
+        <Header />
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </main>
+        <Toaster />
+      </body>
+    </html>
   );
 }

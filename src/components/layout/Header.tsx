@@ -1,22 +1,17 @@
 import { LayoutGrid, Calendar, Settings, LogIn, BookOpen, Compass, MonitorPlay, ShieldCheck } from "lucide-react";
-import { UserButton, SignInButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import NavLink from "@/components/layout/NavLink";
+import AccountMenu from "@/components/layout/AccountMenu";
 
 export default async function Header() {
-  let userId = null;
-  let user = null;
-  
+  // Better Auth のセッションから現在のユーザーを取得（未ログインなら null）
+  let user: { name: string; email: string; role: string; isOperator: boolean } | null = null;
   try {
-    const session = await auth();
-    userId = session.userId;
-    if (userId) {
-      const { getCurrentUser } = await import("@/lib/actions");
-      user = await getCurrentUser();
-    }
-  } catch (e) {
-    console.warn("Clerk auth not available yet", e);
+    const { getCurrentUser } = await import("@/lib/actions");
+    const u = await getCurrentUser();
+    user = { name: u.name, email: u.email, role: u.role, isOperator: u.isOperator };
+  } catch {
+    user = null;
   }
 
   return (
@@ -32,7 +27,7 @@ export default async function Header() {
       </Link>
 
       <nav aria-label="メインナビゲーション" className="flex min-w-0 items-center gap-2 sm:gap-5">
-        {!userId && (
+        {!user && (
           <Link
             href="/demo"
             className="hidden sm:inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors hover:border-primary hover:text-primary"
@@ -42,9 +37,9 @@ export default async function Header() {
           </Link>
         )}
 
-        {userId ? (
+        {user ? (
           <>
-            {user?.role === "STUDENT" ? (
+            {user.role === "STUDENT" ? (
               <div className="flex items-center gap-3 sm:gap-5 sm:mr-4">
                 <NavLink href="/portal" exact title="ポータル" baseClassName="hover:text-emerald-600 transition-colors p-1 rounded-md text-emerald-500" activeClassName="text-emerald-700 bg-emerald-50">
                   <LayoutGrid className="h-5 w-5" />
@@ -61,13 +56,6 @@ export default async function Header() {
                 </div>
               </div>
             ) : (
-              <div className="hidden md:flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 border border-indigo-100 shadow-sm max-w-[240px]">
-                <span className="truncate whitespace-nowrap text-sm font-bold text-indigo-700">{user?.tenant?.name || `${user?.name}さんの指導`}</span>
-              </div>
-            )}
-
-            {/* ナビゲーションリンクの有効化 (メンターのみ) */}
-            {user?.role !== "STUDENT" && (
               <div className="flex items-center gap-2 text-slate-500 sm:mr-4 sm:gap-5">
                 <NavLink href="/" exact title="ダッシュボード">
                   <LayoutGrid className="h-5 w-5" />
@@ -81,22 +69,23 @@ export default async function Header() {
                 <NavLink href="/settings" title="設定">
                   <Settings className="h-5 w-5" />
                 </NavLink>
-                {user?.isOperator && (
+                {user.isOperator && (
                   <NavLink href="/admin" title="運営コンソール" baseClassName="hover:text-indigo-600 transition-colors p-1 rounded-md text-indigo-500" activeClassName="text-indigo-700 bg-indigo-50">
                     <ShieldCheck className="h-5 w-5" />
                   </NavLink>
                 )}
               </div>
             )}
-            <UserButton />
+            <AccountMenu name={user.name} email={user.email} />
           </>
         ) : (
-          <SignInButton mode="modal">
-            <button className="flex h-10 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-bold text-white transition-colors hover:bg-[#243447]">
-              <LogIn className="h-4 w-4" />
-              ログイン
-            </button>
-          </SignInButton>
+          <Link
+            href="/sign-in"
+            className="flex h-10 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-bold text-white transition-colors hover:bg-[#243447]"
+          >
+            <LogIn className="h-4 w-4" />
+            ログイン
+          </Link>
         )}
       </nav>
     </header>

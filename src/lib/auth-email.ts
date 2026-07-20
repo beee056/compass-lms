@@ -1,10 +1,28 @@
+import nodemailer from "nodemailer";
 import { Resend } from "resend";
 
-// Resend 経由の認証メール送信。RESEND_API_KEY 未設定時はエラーにせずログのみ（開発時の利便のため）。
+// 認証メールの送信。送信手段は環境変数で自動選択する:
+//   1) SMTP_HOST があれば SMTP（ロリポップ等の既存メールアカウント。追加登録・DNS不要）
+//   2) RESEND_API_KEY があれば Resend
+//   3) どちらも無ければ送信せずURLをログ出力（開発用フォールバック）
+const smtpHost = process.env.SMTP_HOST;
+const smtpPort = Number(process.env.SMTP_PORT || 465);
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASSWORD;
 const resendApiKey = process.env.RESEND_API_KEY;
-const emailFrom = process.env.EMAIL_FROM || "Scholar Compass <no-reply@p-quest.com>";
+const emailFrom = process.env.EMAIL_FROM || smtpUser || "no-reply@example.com";
 
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const transporter = smtpHost
+  ? nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      // 465はSSL、587はSTARTTLS
+      secure: smtpPort === 465,
+      auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined
+    })
+  : null;
+
+const resend = !transporter && resendApiKey ? new Resend(resendApiKey) : null;
 
 interface AuthEmailParams {
   to: string;
@@ -31,21 +49,42 @@ function renderHtml({ heading, body, actionLabel, actionUrl }: Omit<AuthEmailPar
 </body></html>`;
 }
 
+function renderText({ heading, body, actionLabel, actionUrl }: Omit<AuthEmailParams, "to" | "subject">): string {
+  return `${heading}\n\n${body}\n\n${actionLabel}:\n${actionUrl}\n\n---\nScholar Compass / お問い合わせ: info@p-quest.com`;
+}
+
 export async function sendAuthEmail(params: AuthEmailParams): Promise<void> {
   const html = renderHtml(params);
-  if (!resend) {
-    // 開発環境などRESEND未設定時は、リンクをログ出力して手動確認できるようにする
-    console.warn(`[auth-email] RESEND_API_KEY未設定のため送信をスキップ: ${params.subject} -> ${params.to}\n  URL: ${params.actionUrl}`);
+  const text = renderText(params);
+
+  if (transporter) {
+    await transporter.sendMail({
+      from: emailFrom,
+      to: params.to,
+      subject: params.subject,
+      html,
+      text
+    });
     return;
   }
-  const { error } = await resend.emails.send({
-    from: emailFrom,
-    to: params.to,
-    subject: params.subject,
-    html
-  });
-  if (error) {
-    console.error("[auth-email] 送信失敗:", error);
-    throw new Error("メールの送信に失敗しました");
+
+  if (resend) {
+    const { error } = await resend.emails.send({
+      from: emailFrom,
+      to: params.to,
+      subject: params.subject,
+      html,
+      text
+    });
+    if (error) {
+      console.error("[auth-email] Resend送信失敗:", error);
+      throw new Error("メールの送信に失敗しました");
+    }
+    return;
   }
+
+  // 開発環境など未設定時は、リンクをログ出力して手動確認できるようにする
+  console.warn(
+    `[auth-email] 送信手段が未設定のためスキップ: ${params.subject} -> ${params.to}\n  URL: ${params.actionUrl}`
+  );
 }

@@ -78,7 +78,27 @@ node scripts/migrate-clerk-to-better-auth.mjs --commit # 実行
 git checkout master && git merge feat/better-auth && git push
 ```
 
-## ユーザー提供待ち
-- **RESEND_API_KEY**（Resendでアカウント作成→APIキー）
-- **送信ドメインのDNS**（Resendで p-quest.com か mail.p-quest.com を検証。ムームードメインにSPF/DKIMのCNAME追加）
-- EMAIL_FROM の最終決定（例: no-reply@p-quest.com）
+## メール送信方式（Resend不要・既存メールでOK）
+
+`p-quest.com` のメールは**ロリポップ**（MX: `mx01.lolipop.jp` / SPF: `include:_spf.heteml.jp`）で運用中。
+既存の `info@p-quest.com` の**SMTPをそのまま使えば、新規サービス登録もDNS変更も不要**。
+SPFは既にロリポップ側を許可済みのため、送信認証も追加作業なしで通る。
+
+`auth-email.ts` は環境変数で送信手段を自動選択する:
+1. `SMTP_HOST` があれば **SMTP**（推奨・ロリポップ）
+2. `RESEND_API_KEY` があれば Resend
+3. どちらも無ければ送信せずURLをログ出力（開発用）
+
+### 必要な環境変数（SMTP方式）
+```
+SMTP_HOST="smtp.lolipop.jp"
+SMTP_PORT="465"                 # 465(SSL) または 587(STARTTLS)
+SMTP_USER="info@p-quest.com"    # ロリポップのメールアドレス
+SMTP_PASSWORD="（メールのパスワード）"
+EMAIL_FROM="Scholar Compass <info@p-quest.com>"
+```
+※正確な値はロリポップ管理画面「メール」→ 該当アドレス →「設定情報」で確認できる。
+
+### 検証済み
+`node --experimental-strip-types scripts/test_auth_email.mjs` で、実SMTP送信
+（確認メール・パスワード再設定メールの2種）が成功することを確認済み。

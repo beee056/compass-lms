@@ -12,6 +12,7 @@ import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
 import PracticeSection from "@/components/PracticeSection";
+import LessonLogSection from "@/components/LessonLogSection";
 import ShareLinkManager from "@/components/ShareLinkManager";
 
 // AI添削・問題生成（このページから呼ばれるServer Action）が
@@ -52,7 +53,8 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
           orderBy: { dueDate: 'asc' }
         },
         milestones: { orderBy: { date: 'asc' } },
-        practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } }
+        practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } },
+        lessonLogs: { orderBy: { lessonDate: 'desc' }, take: 100 }
       }
     }),
     getTemplates(),
@@ -86,6 +88,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     tasks: dbStudent.tasks,
     milestones: dbStudent.milestones,
     practiceRecords: dbStudent.practiceRecords,
+    lessonLogs: dbStudent.lessonLogs,
     highSchool: dbStudent.highSchool || "",
     grade: dbStudent.grade || "",
     phone: dbStudent.phone || "",
@@ -212,6 +215,13 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
             initialRecords={safeStudent.practiceRecords as any[]}
             isMentorView={!isStudentViewer}
             questionBank={questionBank}
+          />
+
+          {/* 授業・面談記録 */}
+          <LessonLogSection
+            studentId={safeStudent.id}
+            initialLogs={safeStudent.lessonLogs as any[]}
+            isMentorView={!isStudentViewer}
           />
         </div>
 

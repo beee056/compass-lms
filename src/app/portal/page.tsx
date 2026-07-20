@@ -7,6 +7,7 @@ import DocumentList from "@/components/DocumentList";
 import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import PracticeSection from "@/components/PracticeSection";
+import LessonLogSection from "@/components/LessonLogSection";
 import TenantStatusNotice from "@/components/TenantStatusNotice";
 
 // AI添削（このページから呼ばれるServer Action）がタイムアウトしないよう上限を延長
@@ -43,7 +44,8 @@ export default async function StudentPortalPage() {
       documents: { orderBy: { updatedAt: 'desc' } },
       tasks: { orderBy: { dueDate: 'asc' } },
       milestones: { orderBy: { date: 'asc' } },
-      practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } }
+      practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } },
+        lessonLogs: { orderBy: { lessonDate: 'desc' }, take: 100 }
     }
   });
 
@@ -67,6 +69,7 @@ export default async function StudentPortalPage() {
     tasks: dbStudent.tasks,
     milestones: dbStudent.milestones,
     practiceRecords: dbStudent.practiceRecords,
+    lessonLogs: dbStudent.lessonLogs,
     highSchool: sData.highSchool || "",
     grade: sData.grade || "",
     phone: sData.phone || "",
@@ -155,6 +158,12 @@ export default async function StudentPortalPage() {
             studentId={safeStudent.id} 
             initialRecords={safeStudent.practiceRecords as any[]} 
             questionBank={questionBank}
+          />
+
+          {/* 授業・面談記録（生徒は閲覧のみ） */}
+          <LessonLogSection
+            studentId={safeStudent.id}
+            initialLogs={safeStudent.lessonLogs as any[]}
           />
         </div>
 

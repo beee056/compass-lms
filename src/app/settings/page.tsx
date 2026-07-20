@@ -3,8 +3,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getTenant, getTemplates } from "@/lib/actions";
+import { getTenantInvites } from "@/lib/actions/tenant-invites";
+import MentorInviteManager from "@/components/MentorInviteManager";
 import SettingsTabs from "./SettingsTabs";
 
 export default async function SettingsPage() {
@@ -16,6 +19,7 @@ export default async function SettingsPage() {
 
   const tenant = await getTenant();
   const templates = await getTemplates();
+  const { invites, mentors } = await getTenantInvites();
 
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20">
@@ -33,6 +37,22 @@ export default async function SettingsPage() {
         >
           問題バンク管理
         </a>
+      </div>
+
+      <div className="mb-8 grid gap-4">
+        <MentorInviteManager invites={invites} mentors={mentors} />
+        <Link
+          href="/settings/question-bank"
+          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-indigo-300"
+        >
+          <span>
+            <span className="block text-base font-black text-slate-800">問題バンク管理</span>
+            <span className="mt-1 block text-sm font-medium text-slate-500">
+              演習問題の承認・編集・アーカイブを行います。
+            </span>
+          </span>
+          <span className="text-sm font-bold text-indigo-600">開く →</span>
+        </Link>
       </div>
 
       <SettingsTabs tenant={tenant} templates={templates} />

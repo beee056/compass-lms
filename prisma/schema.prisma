@@ -24,6 +24,25 @@ model Tenant {
   students         StudentProfile[]
   templates        TaskTemplate[]
   logs             ActivityLog[]
+  invites          TenantInvite[]
+}
+
+// テナント（塾）へのメンター招待。招待メールで登録すると同じワークスペースに参加する。
+// 生徒招待(studentEmail)と同じ「メール一致」方式。メールはサインアップ時に検証済み。
+model TenantInvite {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email          String
+  token          String    @unique
+  invitedByUserId String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([email])
 }
 
 model User {
@@ -123,6 +142,7 @@ model StudentProfile {
   stepAnswers    StepAnswer[]
   logs           ActivityLog[]
   sharedTokens   SharedAccessToken[]
+  lessonLogs     LessonLog[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -287,6 +307,27 @@ model SharedAccessToken {
   createdAt        DateTime       @default(now())
 
   @@index([studentProfileId])
+}
+
+// 授業・面談の記録（講師が記入）。旧スプレッドシートの「授業記録」タブに対応。
+// 項目: 記載講師 / 授業日 / 開始・終了時間 / 授業でやったこと / 宿題 / 次回授業 / メモ
+model LessonLog {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  authorUserId     String?        // 記載講師のUser ID
+  authorName       String         // 記載講師名（表示用キャッシュ）
+  lessonDate       DateTime       // 授業日
+  startTime        String?        // "14:00"
+  endTime          String?        // "15:30"
+  content          String         @db.Text // 授業でやったこと
+  homework         String?        @db.Text // 宿題
+  nextPlan         String?        @db.Text // 次回授業の予定
+  memo             String?        @db.Text // メモ
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([studentProfileId, lessonDate])
 }
 
 model Course {

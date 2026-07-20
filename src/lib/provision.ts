@@ -41,6 +41,20 @@ export async function provisionUser(input: { id: string; email: string; name?: s
     return;
   }
 
+  // 3.5) メンターとして招待されている → 招待元のワークスペースへ参加
+  const invite = await prisma.tenantInvite.findFirst({
+    where: { email, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, tenantId: true }
+  });
+  if (invite) {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id }, data: { role: "MENTOR", tenantId: invite.tenantId } }),
+      prisma.tenantInvite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } })
+    ]);
+    return;
+  }
+
   // 4) 新規ワークスペース作成（ownerEmail一意制約で重複を防止）
   try {
     const tenant = await prisma.tenant.create({

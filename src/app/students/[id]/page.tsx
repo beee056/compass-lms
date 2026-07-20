@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, School, Phone } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, getTemplates, getActivityLogs } from "@/lib/actions";
+import { getRestrictedStudentIds } from "@/lib/authz";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import EditStudentDialog from "@/components/EditStudentDialog";
@@ -13,6 +14,7 @@ import MilestoneSection from "@/components/MilestoneSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
 import PracticeSection from "@/components/PracticeSection";
 import LessonLogSection from "@/components/LessonLogSection";
+import AdmissionTrackerSection from "@/components/AdmissionTrackerSection";
 import ShareLinkManager from "@/components/ShareLinkManager";
 
 // AI添削・問題生成（このページから呼ばれるServer Action）が
@@ -34,6 +36,9 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     }
   }
 
+  // 限定アクセス講師（招待時に生徒を選んで渡された講師）は、割り当てられた生徒のみ閲覧可能
+  const restrictedIds = isStudentViewer ? null : await getRestrictedStudentIds(user);
+
   // 独立した4クエリを並列取得（直列awaitによる体感遅延を解消）
   const [rawQuestionBank, dbStudent, templates, logs] = await Promise.all([
     prisma.questionBank.findMany({
@@ -44,7 +49,11 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
       select: { id: true, category: true, title: true, university: true, fieldCategory: true }
     }),
     prisma.studentProfile.findFirst({
-      where: { id: params.id, tenantId: user.tenantId },
+      where: {
+        id: params.id,
+        tenantId: user.tenantId,
+        ...(restrictedIds ? { id: { in: restrictedIds } } : {})
+      },
       include: {
         universities: true,
         documents: { orderBy: { updatedAt: 'desc' } },
@@ -221,6 +230,12 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
           <LessonLogSection
             studentId={safeStudent.id}
             initialLogs={safeStudent.lessonLogs as any[]}
+            isMentorView={!isStudentViewer}
+          />
+
+          {/* 入試状況（出願管理） */}
+          <AdmissionTrackerSection
+            universities={safeStudent.universities as any[]}
             isMentorView={!isStudentViewer}
           />
         </div>

@@ -15,6 +15,7 @@ import {
   findAuthorizedTask,
   findAuthorizedDocument,
   findAuthorizedUniversity,
+  getRestrictedStudentIds,
   toClientError,
   ValidationError
 } from "./authz";
@@ -87,7 +88,9 @@ export async function getCurrentUser() {
 
   // プロビジョニングは本来サインアップ時のフックで完了しているが、万一未確定の場合の
   // フォールバック。provisionUserは冪等かつ並行安全（ownerEmail一意制約で重複防止）。
-  if (!user.tenantId) {
+  // メンター（非生徒）は毎回呼び直し、届いた招待への「乗り換え」も自己修復する
+  // （招待メール登録前にサインアップし、後から招待を受けたケースの救済）。
+  if (!user.tenantId || user.role !== "STUDENT") {
     await provisionUser({ id: user.id, email, name: user.name });
     user = await prisma.user.findUnique({
       where: { id: authUserId },
@@ -135,9 +138,10 @@ export async function getStudents() {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
+    const restrictedIds = await getRestrictedStudentIds(user);
 
     const students = await prisma.studentProfile.findMany({
-      where: { tenantId: user.tenantId },
+      where: { tenantId: user.tenantId, ...(restrictedIds ? { id: { in: restrictedIds } } : {}) },
       include: {
         universities: true,
         // 最終活動（アクティビティログの最新1件）で停滞を検知
@@ -312,17 +316,21 @@ export async function getScheduleData() {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
+    const restrictedIds = await getRestrictedStudentIds(user);
+    const studentFilter = restrictedIds
+      ? { tenantId: user.tenantId, id: { in: restrictedIds } }
+      : { tenantId: user.tenantId };
 
-    // 全生徒のマイルストーンとタスクを並列取得
+    // 全生徒（限定アクセス講師は割当済みの生徒のみ）のマイルストーンとタスクを並列取得
     const [milestones, rawTasks] = await Promise.all([
       prisma.milestone.findMany({
-        where: { studentProfile: { tenantId: user.tenantId } },
+        where: { studentProfile: studentFilter },
         include: { studentProfile: true },
         orderBy: { date: 'asc' }
       }),
       prisma.task.findMany({
         where: {
-          studentProfile: { tenantId: user.tenantId },
+          studentProfile: studentFilter,
           completed: false,
           dueDate: { not: null }
         },

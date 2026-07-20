@@ -8,6 +8,7 @@ import TaskSection from "@/components/TaskSection";
 import MilestoneSection from "@/components/MilestoneSection";
 import PracticeSection from "@/components/PracticeSection";
 import LessonLogSection from "@/components/LessonLogSection";
+import AdmissionTrackerSection from "@/components/AdmissionTrackerSection";
 import TenantStatusNotice from "@/components/TenantStatusNotice";
 
 // AI添削（このページから呼ばれるServer Action）がタイムアウトしないよう上限を延長
@@ -165,6 +166,9 @@ export default async function StudentPortalPage() {
             studentId={safeStudent.id}
             initialLogs={safeStudent.lessonLogs as any[]}
           />
+
+          {/* 入試状況（出願管理・生徒は閲覧のみ） */}
+          <AdmissionTrackerSection universities={safeStudent.universities as any[]} />
         </div>
 
         {/* Compass Signature Milestone Column */}

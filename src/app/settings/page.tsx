@@ -19,7 +19,7 @@ export default async function SettingsPage() {
 
   const tenant = await getTenant();
   const templates = await getTemplates();
-  const { invites, mentors } = await getTenantInvites();
+  const { invites, mentors, students, canManageAccess } = await getTenantInvites();
 
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20">
@@ -40,7 +40,7 @@ export default async function SettingsPage() {
       </div>
 
       <div className="mb-8 grid gap-4">
-        <MentorInviteManager invites={invites} mentors={mentors} />
+        <MentorInviteManager invites={invites} mentors={mentors} students={students} canManageAccess={canManageAccess} />
         <Link
           href="/settings/question-bank"
           className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-indigo-300"

@@ -36,6 +36,10 @@ model TenantInvite {
   email          String
   token          String    @unique
   invitedByUserId String?
+  // true = ワークスペース内の全生徒にアクセス可能（オーナーと同等）
+  // false = studentIds で指定した生徒のみアクセス可能
+  grantFullAccess Boolean  @default(false)
+  studentIds     String[]  @default([])
   expiresAt      DateTime
   acceptedAt     DateTime?
   revokedAt      DateTime?
@@ -55,6 +59,9 @@ model User {
   role           String          @default("MENTOR") // "STUDENT", "MENTOR", "ADMIN"
   // 運営者フラグ。環境変数OPERATOR_EMAILSと同期され、/admin配下でのみ横断権限が効く
   isOperator     Boolean         @default(false)
+  // true(既定) = ワークスペース内の全生徒にアクセス可能（オーナー・招待時にフルアクセスを付与された講師）
+  // false = studentAccess で明示的に割り当てられた生徒のみ閲覧・操作可能（招待時に生徒を選んで渡された講師）
+  hasFullTenantAccess Boolean    @default(true)
   name           String
   email          String          @unique
   // Better Auth 必須フィールド
@@ -64,11 +71,27 @@ model User {
   updatedAt      DateTime        @updatedAt
   // 生徒本人のログインアカウント（1:1）
   studentProfile StudentProfile? @relation("StudentLogin")
+  // 限定アクセスの講師に割り当てられた生徒（hasFullTenantAccess=falseの場合のみ意味を持つ）
+  studentAccess  StudentMentorAccess[]
   // Better Auth リレーション
   sessions       Session[]
   accounts       Account[]
 
   @@index([tenantId])
+}
+
+// 限定アクセスの講師（hasFullTenantAccess=false）が閲覧・操作できる生徒の割当。
+// オーナー・フルアクセス講師が招待時または後から選択して付与する。
+model StudentMentorAccess {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@unique([studentProfileId, userId])
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +166,7 @@ model StudentProfile {
   logs           ActivityLog[]
   sharedTokens   SharedAccessToken[]
   lessonLogs     LessonLog[]
+  studentMentorAccess StudentMentorAccess[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -150,6 +174,8 @@ model StudentProfile {
   @@index([tenantId, status])
 }
 
+// 大学・学部ごとの出願管理（旧管理シート「入試状況」タブに対応）。
+// 基本情報（name/department/method）に加え、出願実務の進捗を1件ずつ管理する。
 model University {
   id               String         @id @default(cuid())
   studentProfileId String
@@ -157,6 +183,20 @@ model University {
   name             String
   department       String
   method           String       // e.g., "総合型選抜"
+  // --- 出願管理（すべて任意。旧シートの列に対応） ---
+  examName             String?  // 入試の名称（例: 公募推薦、探究評価型）
+  openCampusAttended   Boolean  @default(false) // オープンキャンパス参加
+  applicationRequirements String? @db.Text      // 出願条件
+  declinePolicy        String?  // 合格時の辞退可否: "可" / "不可" / "専願"
+  needsMotivationLetter    Boolean @default(false) // 志望理由書の要否
+  needsSelfRecommendation  Boolean @default(false) // 自己推薦書の要否
+  needsActivityReport      Boolean @default(false) // 活動報告書の要否
+  otherDocuments        String? @db.Text  // その他必要書類の詳細
+  applicationDeadline   DateTime? // 出願期限
+  deadlineType          String?   // "必着" / "消印有効"
+  mentorSubmissionDueDate DateTime? // 講師への提出予定日
+  progressStatus        String  @default("準備中") // 未着手/準備中/提出済/選考中/合格/不合格/辞退 等
+  progressNote           String? @db.Text // 進捗状況の補足メモ
   milestones       Milestone[]
   tasks            Task[]
 

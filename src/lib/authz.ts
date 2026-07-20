@@ -13,6 +13,8 @@ export interface SessionUser {
   tenantId: string;
   role: string;
   isOperator?: boolean;
+  // false = 限定アクセス講師（招待時に選ばれた生徒のみ閲覧可）。未定義/true = 全生徒アクセス可
+  hasFullTenantAccess?: boolean;
   studentProfile?: { id: string } | null;
 }
 
@@ -80,8 +82,33 @@ export async function getOwnStudentProfileId(user: SessionUser): Promise<string 
   return profile?.id ?? null;
 }
 
+// 限定アクセス講師（hasFullTenantAccess=false）が、指定の生徒への割当を持つか検証する。
+// フルアクセス（オーナー・undefined含む）は常に許可。
+async function assertMentorStudentAssignment(user: SessionUser, studentProfileId: string): Promise<void> {
+  if (user.hasFullTenantAccess === false) {
+    const access = await prisma.studentMentorAccess.findUnique({
+      where: { studentProfileId_userId: { studentProfileId, userId: user.id } },
+      select: { id: true }
+    });
+    if (!access) {
+      throw new AuthorizationError("対象の生徒が見つかりません");
+    }
+  }
+}
+
+// 限定アクセス講師が閲覧・操作できる生徒IDの一覧を返す（一覧系クエリの絞り込み用）。
+// フルアクセスの場合は null を返す（絞り込み不要の意）。
+export async function getRestrictedStudentIds(user: SessionUser): Promise<string[] | null> {
+  if (user.role === "STUDENT" || user.hasFullTenantAccess !== false) return null;
+  const rows = await prisma.studentMentorAccess.findMany({
+    where: { userId: user.id },
+    select: { studentProfileId: true }
+  });
+  return rows.map((r) => r.studentProfileId);
+}
+
 // 対象の生徒プロフィールを操作できるか検証する
-// メンター: 自テナント内の生徒のみ / 生徒: 本人のみ
+// メンター: 自テナント内の生徒のみ（限定アクセス講師は割当済みの生徒のみ） / 生徒: 本人のみ
 export async function assertStudentAccess(user: SessionUser, studentProfileId: string): Promise<void> {
   if (user.role === "STUDENT") {
     const ownId = await getOwnStudentProfileId(user);
@@ -98,6 +125,7 @@ export async function assertStudentAccess(user: SessionUser, studentProfileId: s
   if (!student) {
     throw new AuthorizationError("対象の生徒が見つかりません");
   }
+  await assertMentorStudentAssignment(user, studentProfileId);
 }
 
 // タスクを取得し、所有権を検証して返す
@@ -114,6 +142,8 @@ export async function findAuthorizedTask(user: SessionUser, taskId: string) {
     if (task.studentProfileId !== ownId) {
       throw new AuthorizationError();
     }
+  } else {
+    await assertMentorStudentAssignment(user, task.studentProfileId);
   }
   return task;
 }
@@ -132,6 +162,8 @@ export async function findAuthorizedDocument(user: SessionUser, documentId: stri
     if (doc.studentProfileId !== ownId) {
       throw new AuthorizationError();
     }
+  } else {
+    await assertMentorStudentAssignment(user, doc.studentProfileId);
   }
   return doc;
 }
@@ -145,5 +177,6 @@ export async function findAuthorizedUniversity(user: SessionUser, universityId: 
   if (!university || !university.studentProfile || university.studentProfile.tenantId !== user.tenantId) {
     throw new AuthorizationError("対象の志望校が見つかりません");
   }
+  await assertMentorStudentAssignment(user, university.studentProfileId);
   return university;
 }

@@ -6,7 +6,7 @@ import prisma from "../prisma";
 import { generateText } from "ai";
 import { getAIModel } from "../ai-model";
 import { getCurrentUser } from "../actions";
-import { assertActiveTenant, assertMentor, assertStudentAccess, findAuthorizedDocument, toClientError } from "../authz";
+import { assertActiveTenant, assertMentor, assertStudentAccess, findAuthorizedDocument, findAuthorizedUniversity, ValidationError, toClientError } from "../authz";
 import { endOfDayJST } from "../dates";
 
 const documentDraftPrompt = `
@@ -21,12 +21,22 @@ const documentDraftPrompt = `
 - 最終的に生徒がこのテキストをエディタで直接編集しますので、不要な前置き（「それでは作成します」等）は省略し、いきなり本文から書き始めてください
 `;
 
-export async function generateDocumentDraft(studentId: string, type: string, universityName: string, keywords: string, dueDateStr?: string | null) {
+async function validateUniversitySelection(user: Awaited<ReturnType<typeof getCurrentUser>>, studentId: string, universityId?: string | null) {
+  if (!universityId) return null;
+  const university = await findAuthorizedUniversity(user, universityId);
+  if (university.studentProfileId !== studentId) {
+    throw new ValidationError("選択した志望校がこの生徒に紐づいていません");
+  }
+  return university.id;
+}
+
+export async function generateDocumentDraft(studentId: string, type: string, universityName: string, keywords: string, dueDateStr?: string | null, universityId?: string | null) {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
     await assertActiveTenant(user);
+    const validatedUniversityId = await validateUniversitySelection(user, studentId, universityId);
 
     const student = await prisma.studentProfile.findUnique({
       where: { id: studentId }
@@ -57,6 +67,7 @@ ${keywords}
       data: {
         id: docId,
         studentProfileId: studentId,
+        universityId: validatedUniversityId,
         title: `${type}_${universityName}_AIドラフト`,
         type: type,
         dueDate: parsedDueDate,
@@ -93,13 +104,15 @@ export async function createBlankDocument(
   studentId: string,
   type: string,
   universityName: string,
-  dueDateStr?: string | null
+  dueDateStr?: string | null,
+  universityId?: string | null
 ) {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
     await assertActiveTenant(user);
+    const validatedUniversityId = await validateUniversitySelection(user, studentId, universityId);
 
     const student = await prisma.studentProfile.findUnique({ where: { id: studentId } });
     if (!student) throw new Error("Student not found");
@@ -111,6 +124,7 @@ export async function createBlankDocument(
       data: {
         id: `doc-${randomUUID()}`,
         studentProfileId: studentId,
+        universityId: validatedUniversityId,
         title,
         type,
         dueDate: parsedDueDate,

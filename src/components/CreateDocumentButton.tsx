@@ -12,26 +12,34 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-export default function CreateDocumentButton({ studentId, universities }: { studentId: string; universities: string[] }) {
+interface UniversityOption {
+  id: string;
+  label: string;
+}
+
+export default function CreateDocumentButton({ studentId, universities }: { studentId: string; universities: UniversityOption[] }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<"docs" | "ai" | "blank">("blank");
   const [docType, setDocType] = useState("自己推薦書");
-  const [selectedUni, setSelectedUni] = useState("共通");
+  const [selectedUniversityId, setSelectedUniversityId] = useState("common");
   const [dueDate, setDueDate] = useState("");
   const [keywords, setKeywords] = useState("");
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedUniversity = universities.find((university) => university.id === selectedUniversityId);
+    const universityName = selectedUniversity?.label ?? "共通";
+    const universityId = selectedUniversity?.id ?? null;
 
     startTransition(async () => {
       let result;
       if (mode === "docs") {
-        result = await createStudentDocument(studentId, docType, selectedUni, dueDate || null);
+        result = await createStudentDocument(studentId, docType, universityName, dueDate || null, universityId);
       } else if (mode === "blank") {
-        result = await createBlankDocument(studentId, docType, selectedUni, dueDate || null);
+        result = await createBlankDocument(studentId, docType, universityName, dueDate || null, universityId);
       } else {
-        result = await generateDocumentDraft(studentId, docType, selectedUni, keywords, dueDate || null);
+        result = await generateDocumentDraft(studentId, docType, universityName, keywords, dueDate || null, universityId);
       }
       
       if (result.success) {
@@ -104,14 +112,14 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
             {/* 関連志望校の選択 */}
             <div className="grid gap-2">
               <Label htmlFor="selectedUni" className="text-slate-700 font-semibold text-sm">対象の志望校</Label>
-              <Select value={selectedUni} onValueChange={(val) => setSelectedUni(val ?? "共通")}>
+              <Select value={selectedUniversityId} onValueChange={(value) => setSelectedUniversityId(value ?? "common")}>
                 <SelectTrigger className="border-slate-200 bg-white">
                   <SelectValue placeholder="志望校を選択" />
                 </SelectTrigger>
                 <SelectContent className="bg-white">
-                  <SelectItem value="共通">共通 (志望校の指定なし)</SelectItem>
-                  {universities.map((uni, idx) => (
-                    <SelectItem key={idx} value={uni}>{uni}</SelectItem>
+                  <SelectItem value="common">共通 (志望校の指定なし)</SelectItem>
+                  {universities.map((university) => (
+                    <SelectItem key={university.id} value={university.id}>{university.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

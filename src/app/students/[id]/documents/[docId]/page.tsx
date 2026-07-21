@@ -2,12 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/actions";
 import DocumentEditor from "@/components/DocumentEditor";
+import { assertStudentAccess } from "@/lib/authz";
 
 export default async function MentorDocumentPage({ params }: { params: { id: string, docId: string } }) {
   const user = await getCurrentUser();
   if (user.role === "STUDENT") {
     redirect("/portal");
   }
+  await assertStudentAccess(user, params.id);
 
   // 自テナントの生徒の書類のみ閲覧可能
   const document = await prisma.document.findFirst({
@@ -15,7 +17,8 @@ export default async function MentorDocumentPage({ params }: { params: { id: str
       id: params.docId,
       studentProfileId: params.id,
       studentProfile: { tenantId: user.tenantId }
-    }
+    },
+    include: { revisions: { orderBy: { revisionNumber: "desc" }, include: { reviews: { orderBy: { createdAt: "desc" } } } } }
   });
 
   if (!document || !document.isInternal) {
@@ -24,7 +27,7 @@ export default async function MentorDocumentPage({ params }: { params: { id: str
 
   return (
     <div className="px-4 w-full">
-      <DocumentEditor document={document} backUrl={`/students/${params.id}`} />
+      <DocumentEditor document={document} backUrl={`/students/${params.id}`} isMentorView />
     </div>
   );
 }

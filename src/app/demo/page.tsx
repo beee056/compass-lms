@@ -72,10 +72,10 @@ const admissionsRoute = [
 ] as const;
 
 const studentRows = [
-  { name: "山田 太郎", phase: "書類作成", progress: "64%", next: "第2稿レビュー", heat: "high" },
-  { name: "佐藤 花子", phase: "面接対策", progress: "81%", next: "問答の構造化", heat: "medium" },
-  { name: "鈴木 一郎", phase: "資料整理", progress: "58%", next: "証拠資料の照合", heat: "low" },
-  { name: "高橋 美咲", phase: "自己分析", progress: "42%", next: "原体験メモ", heat: "medium" }
+  { name: "山田 太郎", progress: "64%", next: "第2稿レビュー", heat: "high" },
+  { name: "佐藤 花子", progress: "81%", next: "問答の構造化", heat: "medium" },
+  { name: "鈴木 一郎", progress: "58%", next: "証拠資料の照合", heat: "low" },
+  { name: "高橋 美咲", progress: "42%", next: "原体験メモ", heat: "medium" }
 ] as const;
 
 const documentFlow = [
@@ -348,7 +348,6 @@ export default async function PublicDemoPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-black">{student.name}</p>
-                      <p className="mt-1 text-xs font-bold text-slate-500">{student.phase}</p>
                     </div>
                     <span className={`rounded-md px-2 py-1 text-xs font-black ${heatStyles[student.heat]}`}>
                       {student.progress}

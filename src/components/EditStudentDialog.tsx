@@ -16,7 +16,6 @@ interface EditStudentDialogProps {
   student: {
     id: string;
     name: string;
-    phase: string;
     highSchool?: string;
     grade?: string;
     phone?: string;

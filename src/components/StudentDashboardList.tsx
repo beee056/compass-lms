@@ -15,7 +15,6 @@ interface StudentData {
   universities: string[];
   lastUpdated: string;
   initial: string;
-  phase: string;
   highSchool: string;
   grade: string;
   phone: string;

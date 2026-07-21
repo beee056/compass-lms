@@ -105,7 +105,6 @@ export async function getAdminTenantDetail(tenantId: string) {
             id: true,
             name: true,
             grade: true,
-            phase: true,
             status: true,
             updatedAt: true,
             universities: { select: { name: true, department: true }, take: 2 },

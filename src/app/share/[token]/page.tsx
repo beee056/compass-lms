@@ -29,7 +29,6 @@ export default async function SharedProgressPage({ params }: { params: { token: 
     where: { id: link.studentProfileId },
     select: {
       name: true,
-      phase: true,
       universities: { select: { name: true, department: true, method: true } },
       milestones: { select: { title: true, date: true, status: true, type: true }, orderBy: { date: "asc" } },
       tasks: { select: { title: true, completed: true, updatedAt: true } },
@@ -81,9 +80,6 @@ export default async function SharedProgressPage({ params }: { params: { token: 
               <h1 className="text-xl font-black text-slate-800">{student.name} さんの学習状況</h1>
             </div>
           </div>
-          <p className="mt-3 text-sm font-semibold text-slate-500">
-            現在のフェーズ: <span className="text-indigo-600">{student.phase}</span>
-          </p>
         </header>
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

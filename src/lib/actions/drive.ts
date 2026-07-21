@@ -3,15 +3,24 @@
 import { revalidatePath } from "next/cache";
 import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
-import { assertActiveTenant, assertMentor, assertStudentAccess } from "../authz";
+import { assertActiveTenant, assertMentor, assertStudentAccess, findAuthorizedUniversity, ValidationError } from "../authz";
 import { endOfDayJST } from "../dates";
 
-export async function createStudentDocument(studentId: string, documentType: string, universityName?: string, dueDateStr?: string | null) {
+export async function createStudentDocument(studentId: string, documentType: string, universityName?: string, dueDateStr?: string | null, universityId?: string | null) {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
     await assertActiveTenant(user);
+
+    let validatedUniversityId: string | null = null;
+    if (universityId) {
+      const university = await findAuthorizedUniversity(user, universityId);
+      if (university.studentProfileId !== studentId) {
+        throw new ValidationError("選択した志望校がこの生徒に紐づいていません");
+      }
+      validatedUniversityId = university.id;
+    }
 
     const adjustedDueDate = dueDateStr ? endOfDayJST(dueDateStr) : null;
 
@@ -29,6 +38,7 @@ export async function createStudentDocument(studentId: string, documentType: str
       await prisma.document.create({
         data: {
           studentProfileId: studentId,
+          universityId: validatedUniversityId,
           title: `${mockTitle} (新規デモ)`,
           type: documentType,
           url: "https://docs.google.com/document/d/dummy",
@@ -74,6 +84,7 @@ export async function createStudentDocument(studentId: string, documentType: str
     await prisma.document.create({
       data: {
         studentProfileId: student.id,
+        universityId: validatedUniversityId,
         title: customTitle,
         type: documentType,
         url: data.docUrl,

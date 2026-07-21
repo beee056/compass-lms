@@ -96,7 +96,6 @@ export default async function AdminTenantDetailPage({ params }: { params: { id: 
                   </p>
                 </div>
                 <div className="shrink-0 text-right text-xs font-semibold text-slate-500">
-                  <span className="mr-3">フェーズ: {student.phase}</span>
                   <span className="mr-3">演習{student._count.practiceRecords}回</span>
                   <span className="mr-3">書類{student._count.documents}件</span>
                   <span>最終更新 {formatDate(student.updatedAt)}</span>

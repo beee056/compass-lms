@@ -23,14 +23,16 @@ interface MilestoneSectionProps {
   studentId: string;
   initialMilestones: Milestone[];
   isStudent?: boolean;
+  universities?: { id: string; label: string }[];
 }
 
-export default function MilestoneSection({ studentId, initialMilestones, isStudent = false }: MilestoneSectionProps) {
+export default function MilestoneSection({ studentId, initialMilestones, isStudent = false, universities = [] }: MilestoneSectionProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [type, setType] = useState("書類提出");
+  const [universityId, setUniversityId] = useState("common");
 
   const [sendEmail, setSendEmail] = useState(false);
 
@@ -45,12 +47,13 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
     if (!title.trim() || !date) return;
 
     startTransition(async () => {
-      const result = await createMilestone(studentId, title, date, type, sendEmail);
+      const result = await createMilestone(studentId, title, date, type, sendEmail, universityId === "common" ? null : universityId);
       if (result.success) {
         toast.success("マイルストーンを追加しました");
         setTitle("");
         setDate("");
         setType("書類提出");
+        setUniversityId("common");
         setSendEmail(false);
         setOpen(false);
       } else {
@@ -124,6 +127,22 @@ export default function MilestoneSection({ studentId, initialMilestones, isStude
                       </SelectContent>
                     </Select>
                   </div>
+                  {universities.length > 0 && (
+                    <div className="grid gap-2">
+                      <Label className="text-slate-700 font-semibold text-sm">対象の志望校</Label>
+                      <Select value={universityId} onValueChange={(value) => setUniversityId(value ?? "common")}>
+                        <SelectTrigger className="border-slate-200">
+                          <SelectValue placeholder="志望校を選択" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="common">共通（志望校の指定なし）</SelectItem>
+                          {universities.map((university) => (
+                            <SelectItem key={university.id} value={university.id}>{university.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-2">
                     <input 
                       type="checkbox" 

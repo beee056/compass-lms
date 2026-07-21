@@ -22,7 +22,6 @@ interface StudentData {
   lastActivityAt?: string;
   daysSinceActivity?: number;
   initial: string;
-  phase: string;
   highSchool: string;
   grade: string;
   phone: string;
@@ -297,10 +296,7 @@ export default function MentorCommandCenter({
           {selectedStudent ? (
             <div className="mt-5 space-y-4">
               <div className="rounded-lg border border-white/15 bg-white/5 p-4">
-                <span className="rounded-md bg-white/10 px-2.5 py-1 text-xs font-black text-white/80">
-                  {selectedStudent.phase}
-                </span>
-                <p className="mt-3 text-sm leading-6 text-white/70">
+                <p className="text-sm leading-6 text-white/70">
                   {selectedStudent.universities[0] ?? "志望校未設定"}
                 </p>
               </div>

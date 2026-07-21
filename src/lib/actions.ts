@@ -162,7 +162,6 @@ export async function getStudents() {
         lastActivityAt: new Date(lastActivity).toISOString(),
         daysSinceActivity,
         initial: s.name.charAt(0),
-        phase: s.phase,
         highSchool: s.highSchool || "",
         grade: s.grade || "",
         phone: s.phone || "",
@@ -185,7 +184,6 @@ export async function createStudent(formData: FormData) {
 
     const name = validateText(formData.get("name") as string, "氏名", 100);
     const universityStr = validateText(formData.get("university") as string, "志望校", 200);
-    const phase = validateText(formData.get("phase") as string, "フェーズ", 50);
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
     const phone = formData.get("phone") as string || null;
@@ -205,7 +203,8 @@ export async function createStudent(formData: FormData) {
       data: {
         id: studentId,
         name,
-        phase,
+        // 互換用。進捗は志望校ごとの出願状態・書類・日程で管理する。
+        phase: "ACTIVE",
         tenantId: user.tenantId,
         highSchool,
         grade,
@@ -250,9 +249,6 @@ export async function updateStudent(studentId: string, formData: FormData) {
     await assertStudentAccess(user, studentId);
 
     const name = validateText(formData.get("name") as string, "氏名", 100);
-    // フェーズ欄は編集UIから外したため、送信がない場合は既存値を維持する
-    const phaseInput = formData.get("phase") as string | null;
-    const phase = phaseInput ? validateText(phaseInput, "フェーズ", 50) : undefined;
     const highSchool = formData.get("highSchool") as string || null;
     const grade = formData.get("grade") as string || null;
     const phone = formData.get("phone") as string || null;
@@ -264,7 +260,6 @@ export async function updateStudent(studentId: string, formData: FormData) {
       where: { id: studentId },
       data: {
         name,
-        phase,
         highSchool,
         grade,
         phone,
@@ -321,12 +316,22 @@ export async function getScheduleData() {
       ? { tenantId: user.tenantId, id: { in: restrictedIds } }
       : { tenantId: user.tenantId };
 
-    // 全生徒（限定アクセス講師は割当済みの生徒のみ）のマイルストーンとタスクを並列取得
-    const [milestones, rawTasks] = await Promise.all([
+    // 全生徒（限定アクセス講師は割当済みの生徒のみ）のマイルストーン・出願日程・タスクを並列取得
+    const [storedMilestones, admissionSchedules, rawTasks] = await Promise.all([
       prisma.milestone.findMany({
         where: { studentProfile: studentFilter },
         include: { studentProfile: true },
         orderBy: { date: 'asc' }
+      }),
+      prisma.university.findMany({
+        where: {
+          studentProfile: studentFilter,
+          OR: [
+            { applicationDeadline: { not: null } },
+            { mentorSubmissionDueDate: { not: null } }
+          ]
+        },
+        include: { studentProfile: true }
       }),
       prisma.task.findMany({
         where: {
@@ -342,6 +347,49 @@ export async function getScheduleData() {
         orderBy: { dueDate: 'asc' }
       })
     ]);
+
+    const storedSourceKeys = new Set(storedMilestones.map((milestone) => milestone.sourceKey).filter(Boolean));
+    const derivedMilestones = admissionSchedules.flatMap((university) => {
+      const universityLabel = `${university.name} ${university.department}`;
+      return [
+        ...(university.applicationDeadline && !storedSourceKeys.has(`university:${university.id}:applicationDeadline`)
+          ? [{
+              id: `admission-${university.id}`,
+              studentProfileId: university.studentProfileId,
+              universityId: university.id,
+              title: `【${universityLabel}】出願締切`,
+              date: university.applicationDeadline,
+              status: "TODO",
+              type: "出願締切",
+              sourceKind: "ADMISSION",
+              sourceKey: `university:${university.id}:applicationDeadline`,
+              deadlineRule: university.deadlineType,
+              notes: null,
+              studentProfile: university.studentProfile
+            }]
+          : []),
+        ...(university.mentorSubmissionDueDate && !storedSourceKeys.has(`university:${university.id}:mentorSubmissionDueDate`)
+          ? [{
+              id: `mentor-submission-${university.id}`,
+              studentProfileId: university.studentProfileId,
+              universityId: university.id,
+              title: `【${universityLabel}】講師への書類提出`,
+              date: university.mentorSubmissionDueDate,
+              status: "TODO",
+              type: "塾内締切",
+              sourceKind: "ADMISSION",
+              sourceKey: `university:${university.id}:mentorSubmissionDueDate`,
+              deadlineRule: null,
+              notes: null,
+              studentProfile: university.studentProfile
+            }]
+          : [])
+      ];
+    });
+
+    const milestones = [...storedMilestones, ...derivedMilestones].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
 
     // needsReply: 最後の発言が生徒 = メンターの返信待ち
     const tasks = rawTasks.map((t: any) => ({
@@ -510,17 +558,32 @@ export async function updateDocument(documentId: string, title: string, dueDateS
 }
 
 // マイルストーン作成アクション
-export async function createMilestone(studentId: string, title: string, dateStr: string, type: string, sendEmailNotification: boolean = false) {
+export async function createMilestone(
+  studentId: string,
+  title: string,
+  dateStr: string,
+  type: string,
+  sendEmailNotification: boolean = false,
+  universityId?: string | null
+) {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
     await assertStudentAccess(user, studentId);
     const validTitle = validateText(title, "マイルストーン名");
 
+    if (universityId) {
+      const university = await findAuthorizedUniversity(user, universityId);
+      if (university.studentProfileId !== studentId) {
+        throw new ValidationError("選択した志望校がこの生徒に紐づいていません");
+      }
+    }
+
     await prisma.milestone.create({
       data: {
         id: generateId('milestone'),
         studentProfileId: studentId,
+        universityId: universityId || null,
         title: validTitle,
         date: parseDayStart(dateStr),
         type,
@@ -657,6 +720,7 @@ export async function addUniversity(studentId: string, name: string, department:
         const tasksToCreate = template.items.map((item: any) => ({
           id: generateId('task'),
           studentProfileId: studentId,
+          universityId: newUni.id,
           title: `【${name}】${item.title}`,
           type: item.type,
           dueDate: getFutureDate(item.daysOffset),
@@ -671,6 +735,7 @@ export async function addUniversity(studentId: string, name: string, department:
           {
             id: generateId('task'),
             studentProfileId: studentId,
+            universityId: newUni.id,
             title: `【${name}】アドミッション・ポリシー確認と志望理由の整理`,
             type: "TODO",
             dueDate: getFutureDate(3),
@@ -679,6 +744,7 @@ export async function addUniversity(studentId: string, name: string, department:
           {
             id: generateId('task'),
             studentProfileId: studentId,
+            universityId: newUni.id,
             title: `【${name}】自己推薦書/志望理由書 構成案作成`,
             type: "DOCUMENT",
             dueDate: getFutureDate(7),

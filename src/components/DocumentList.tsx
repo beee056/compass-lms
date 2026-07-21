@@ -39,7 +39,7 @@ interface DocumentListProps {
   studentId: string;
   driveUrl: string | null;
   initialDocuments: Document[];
-  universities: string[];
+  universities: { id: string; label: string }[];
   isStudent?: boolean;
 }
 
@@ -130,19 +130,22 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
             </div>
           ) : (
             activeDocs.map((doc) => (
-              <div key={doc.id} className="p-5 flex items-center justify-between hover:bg-slate-50/80 transition-colors group">
-                <div className="flex items-center gap-5">
+              <div
+                key={doc.id}
+                className="group grid gap-4 p-5 transition-colors hover:bg-slate-50/80 md:grid-cols-[minmax(0,1fr)_8.5rem_7rem_auto] md:items-center"
+              >
+                <div className="flex min-w-0 items-start gap-4">
                   <div className="p-3 bg-indigo-50/50 text-indigo-600 rounded-xl border border-indigo-100/50">
                     <FileText className="h-5 w-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     {doc.isInternal ? (
                       <a 
                         href={isStudent ? `/portal/documents/${doc.id}` : `/students/${studentId}/documents/${doc.id}`} 
-                        className="font-bold text-slate-800 hover:text-indigo-600 transition-colors flex items-center gap-2 text-base"
+                        className="flex min-w-0 items-start gap-2 font-bold text-slate-800 transition-colors hover:text-indigo-600"
                       >
-                        {doc.title}
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-sm font-bold ml-1">アプリ内</span>
+                        <span className="min-w-0 break-words leading-6">{doc.title}</span>
+                        <span className="mt-0.5 shrink-0 whitespace-nowrap rounded-sm bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">アプリ内</span>
                       </a>
                     ) : doc.url ? (
                       <a 
@@ -157,7 +160,7 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                     ) : (
                       <span className="font-bold text-slate-800 text-base">{doc.title}</span>
                     )}
-                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] py-0.5 px-2 bg-slate-100/80 text-slate-500 font-bold rounded-sm border border-slate-200/50">
                         {doc.type}
                       </span>
@@ -166,17 +169,27 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                           {STATUS_LABEL[doc.status || "DRAFT"]}
                         </span>
                       )}
-                      {doc.dueDate && (
-                        <span className="text-xs text-indigo-500 font-bold flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          期限: {new Date(doc.dueDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
-                        </span>
-                      )}
-                      <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                        更新: {new Date(doc.updatedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
-                      </span>
                     </div>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-xs font-bold text-indigo-500 md:block">
+                  <span className="text-slate-400 md:mb-1 md:block md:text-[10px] md:uppercase md:tracking-wider">期限</span>
+                  {doc.dueDate ? (
+                    <span className="inline-flex whitespace-nowrap items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {new Date(doc.dueDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
+                    </span>
+                  ) : (
+                    <span className="text-slate-300">未設定</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 text-xs font-medium text-slate-500 md:block">
+                  <span className="text-slate-400 md:mb-1 md:block md:text-[10px] md:uppercase md:tracking-wider">更新</span>
+                  <span className="whitespace-nowrap">
+                    {new Date(doc.updatedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
+                  </span>
                 </div>
 
                 {/* 生徒: 内部書類を提出するボタン（下書き/差し戻し時のみ） */}
@@ -184,21 +197,21 @@ export default function DocumentList({ studentId, driveUrl, initialDocuments, un
                   <button
                     onClick={() => handleSubmit(doc.id)}
                     disabled={isPending}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60 md:justify-self-end"
                   >
                     <Send className="h-4 w-4" />
                     提出する
                   </button>
                 )}
                 {isStudent && doc.status === "DONE" && (
-                  <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-emerald-600 md:justify-self-end">
                     <CheckCircle2 className="h-4 w-4" />
                     完了
                   </span>
                 )}
 
                 {!isStudent && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 md:justify-self-end">
                     {/* メンター: ステータス変更 */}
                     {doc.isInternal && (
                       <select

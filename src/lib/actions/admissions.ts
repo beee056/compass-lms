@@ -5,6 +5,7 @@ import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
 import { assertMentor, findAuthorizedUniversity, toClientError, ValidationError } from "../authz";
 import { startOfDayJST } from "../dates";
+import type { Prisma } from "@prisma/client";
 import {
   PROGRESS_STATUSES,
   DECLINE_POLICIES,
@@ -45,6 +46,48 @@ function validate(input: AdmissionInput) {
   if (input.examName && input.examName.length > 100) throw new ValidationError("入試の名称は100字以内で入力してください");
 }
 
+async function syncAdmissionMilestone(
+  tx: Prisma.TransactionClient,
+  university: { id: string; studentProfileId: string; name: string; department: string },
+  kind: "applicationDeadline" | "mentorSubmissionDueDate",
+  date: Date | null | undefined,
+  deadlineRule?: string | null
+) {
+  if (date === undefined) return;
+
+  const sourceKey = `university:${university.id}:${kind}`;
+  if (date === null) {
+    await tx.milestone.deleteMany({ where: { sourceKey } });
+    return;
+  }
+
+  const isOfficialDeadline = kind === "applicationDeadline";
+  const universityLabel = `${university.name} ${university.department}`;
+  await tx.milestone.upsert({
+    where: { sourceKey },
+    create: {
+      studentProfileId: university.studentProfileId,
+      universityId: university.id,
+      title: isOfficialDeadline
+        ? `【${universityLabel}】出願締切`
+        : `【${universityLabel}】講師への書類提出`,
+      date,
+      status: "TODO",
+      type: isOfficialDeadline ? "出願締切" : "塾内締切",
+      sourceKind: "ADMISSION",
+      sourceKey,
+      deadlineRule: isOfficialDeadline ? deadlineRule || null : null
+    },
+    update: {
+      title: isOfficialDeadline
+        ? `【${universityLabel}】出願締切`
+        : `【${universityLabel}】講師への書類提出`,
+      date,
+      deadlineRule: isOfficialDeadline ? deadlineRule || null : null
+    }
+  });
+}
+
 export async function updateAdmission(universityId: string, input: AdmissionInput) {
   try {
     const user = await getCurrentUser();
@@ -55,9 +98,10 @@ export async function updateAdmission(universityId: string, input: AdmissionInpu
     const applicationDeadline = parseOptionalDate(input.applicationDeadline);
     const mentorSubmissionDueDate = parseOptionalDate(input.mentorSubmissionDueDate);
 
-    await prisma.university.update({
-      where: { id: universityId },
-      data: {
+    await prisma.$transaction(async (tx) => {
+      const updatedUniversity = await tx.university.update({
+        where: { id: universityId },
+        data: {
         ...(input.examName !== undefined ? { examName: input.examName.trim() || null } : {}),
         ...(input.openCampusAttended !== undefined ? { openCampusAttended: input.openCampusAttended } : {}),
         ...(input.applicationRequirements !== undefined
@@ -75,11 +119,28 @@ export async function updateAdmission(universityId: string, input: AdmissionInpu
         ...(mentorSubmissionDueDate !== undefined ? { mentorSubmissionDueDate } : {}),
         ...(input.progressStatus !== undefined ? { progressStatus: input.progressStatus } : {}),
         ...(input.progressNote !== undefined ? { progressNote: input.progressNote.trim() || null } : {})
-      }
+        }
+      });
+
+      await syncAdmissionMilestone(
+        tx,
+        updatedUniversity,
+        "applicationDeadline",
+        applicationDeadline,
+        input.deadlineType !== undefined ? input.deadlineType : updatedUniversity.deadlineType
+      );
+      await syncAdmissionMilestone(
+        tx,
+        updatedUniversity,
+        "mentorSubmissionDueDate",
+        mentorSubmissionDueDate
+      );
     });
 
     revalidatePath(`/students/${university.studentProfileId}`);
     revalidatePath("/portal");
+    revalidatePath("/");
+    revalidatePath("/schedule");
     return { success: true };
   } catch (error) {
     console.error("Failed to update admission:", error);

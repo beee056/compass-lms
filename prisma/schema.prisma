@@ -30,52 +30,52 @@ model Tenant {
 // テナント（塾）へのメンター招待。招待メールで登録すると同じワークスペースに参加する。
 // 生徒招待(studentEmail)と同じ「メール一致」方式。メールはサインアップ時に検証済み。
 model TenantInvite {
-  id             String    @id @default(cuid())
-  tenantId       String
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email          String
-  token          String    @unique
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email           String
+  token           String    @unique
   invitedByUserId String?
   // true = ワークスペース内の全生徒にアクセス可能（オーナーと同等）
   // false = studentIds で指定した生徒のみアクセス可能
-  grantFullAccess Boolean  @default(false)
-  studentIds     String[]  @default([])
-  expiresAt      DateTime
-  acceptedAt     DateTime?
-  revokedAt      DateTime?
-  createdAt      DateTime  @default(now())
+  grantFullAccess Boolean   @default(false)
+  studentIds      String[]  @default([])
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
   @@index([tenantId])
   @@index([email])
 }
 
 model User {
-  id             String          @id @default(cuid())
+  id                  String                @id @default(cuid())
   // 旧Clerk識別子。移行期間中は残置し、完全移行後に削除する（nullable化済み）
-  clerkId        String?         @unique
+  clerkId             String?               @unique
   // Better Auth のテナント紐付け。プロビジョニング前は一時的にnull
-  tenantId       String?
-  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
-  role           String          @default("MENTOR") // "STUDENT", "MENTOR", "ADMIN"
+  tenantId            String?
+  tenant              Tenant?               @relation(fields: [tenantId], references: [id])
+  role                String                @default("MENTOR") // "STUDENT", "MENTOR", "ADMIN"
   // 運営者フラグ。環境変数OPERATOR_EMAILSと同期され、/admin配下でのみ横断権限が効く
-  isOperator     Boolean         @default(false)
+  isOperator          Boolean               @default(false)
   // true(既定) = ワークスペース内の全生徒にアクセス可能（オーナー・招待時にフルアクセスを付与された講師）
   // false = studentAccess で明示的に割り当てられた生徒のみ閲覧・操作可能（招待時に生徒を選んで渡された講師）
-  hasFullTenantAccess Boolean    @default(true)
-  name           String
-  email          String          @unique
+  hasFullTenantAccess Boolean               @default(true)
+  name                String
+  email               String                @unique
   // Better Auth 必須フィールド
-  emailVerified  Boolean         @default(false)
-  image          String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  emailVerified       Boolean               @default(false)
+  image               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
   // 生徒本人のログインアカウント（1:1）
-  studentProfile StudentProfile? @relation("StudentLogin")
+  studentProfile      StudentProfile?       @relation("StudentLogin")
   // 限定アクセスの講師に割り当てられた生徒（hasFullTenantAccess=falseの場合のみ意味を持つ）
-  studentAccess  StudentMentorAccess[]
+  studentAccess       StudentMentorAccess[]
   // Better Auth リレーション
-  sessions       Session[]
-  accounts       Account[]
+  sessions            Session[]
+  accounts            Account[]
 
   @@index([tenantId])
 }
@@ -142,34 +142,34 @@ model Verification {
 }
 
 model StudentProfile {
-  id             String       @id @default(cuid())
-  tenantId       String
-  tenant         Tenant       @relation(fields: [tenantId], references: [id])
-  name           String
-  phase          String       // e.g., "自己分析", "書類作成"
-  driveFolderId  String?      // Google Drive連携用の生徒固有フォルダID
-  driveFolderUrl String?      // Google Driveフォルダへの直リンク
-  highSchool     String?      // 高校名
-  grade          String?      // 学年
-  phone          String?      // 電話番号
-  parentEmail    String?      // 保護者メールアドレス
-  studentEmail   String?      @unique // 生徒招待・ログイン用メアド
-  userId         String?      @unique // サインアップ後に紐づくUser ID
-  user           User?        @relation("StudentLogin", fields: [userId], references: [id])
-  status         String       @default("ACTIVE") // "ACTIVE" (在籍生) / "ARCHIVED" (卒業生)
-  universities   University[]
-  tasks          Task[]
-  milestones     Milestone[]
-  documents      Document[]
-  practiceRecords PracticeRecord[]
-  stepAnswers    StepAnswer[]
-  logs           ActivityLog[]
-  sharedTokens   SharedAccessToken[]
-  lessonLogs     LessonLog[]
+  id                  String                @id @default(cuid())
+  tenantId            String
+  tenant              Tenant                @relation(fields: [tenantId], references: [id])
+  name                String
+  phase               String // e.g., "自己分析", "書類作成"
+  driveFolderId       String? // Google Drive連携用の生徒固有フォルダID
+  driveFolderUrl      String? // Google Driveフォルダへの直リンク
+  highSchool          String? // 高校名
+  grade               String? // 学年
+  phone               String? // 電話番号
+  parentEmail         String? // 保護者メールアドレス
+  studentEmail        String?               @unique // 生徒招待・ログイン用メアド
+  userId              String?               @unique // サインアップ後に紐づくUser ID
+  user                User?                 @relation("StudentLogin", fields: [userId], references: [id])
+  status              String                @default("ACTIVE") // "ACTIVE" (在籍生) / "ARCHIVED" (卒業生)
+  universities        University[]
+  tasks               Task[]
+  milestones          Milestone[]
+  documents           Document[]
+  practiceRecords     PracticeRecord[]
+  stepAnswers         StepAnswer[]
+  logs                ActivityLog[]
+  sharedTokens        SharedAccessToken[]
+  lessonLogs          LessonLog[]
   studentMentorAccess StudentMentorAccess[]
-  selfProfile    StudentSelfProfile?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  selfProfile         StudentSelfProfile?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -178,30 +178,48 @@ model StudentProfile {
 // 大学・学部ごとの出願管理（旧管理シート「入試状況」タブに対応）。
 // 基本情報（name/department/method）に加え、出願実務の進捗を1件ずつ管理する。
 model University {
-  id               String         @id @default(cuid())
-  studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  name             String
-  department       String
-  method           String       // e.g., "総合型選抜"
+  id                      String               @id @default(cuid())
+  studentProfileId        String
+  studentProfile          StudentProfile       @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  name                    String
+  department              String
+  method                  String // e.g., "総合型選抜"
   // --- 出願管理（すべて任意。旧シートの列に対応） ---
-  examName             String?  // 入試の名称（例: 公募推薦、探究評価型）
-  openCampusAttended   Boolean  @default(false) // オープンキャンパス参加
-  applicationRequirements String? @db.Text      // 出願条件
-  declinePolicy        String?  // 合格時の辞退可否: "可" / "不可" / "専願"
-  needsMotivationLetter    Boolean @default(false) // 志望理由書の要否
-  needsSelfRecommendation  Boolean @default(false) // 自己推薦書の要否
-  needsActivityReport      Boolean @default(false) // 活動報告書の要否
-  otherDocuments        String? @db.Text  // その他必要書類の詳細
-  applicationDeadline   DateTime? // 出願期限
-  deadlineType          String?   // "必着" / "消印有効"
+  examName                String? // 入試の名称（例: 公募推薦、探究評価型）
+  openCampusAttended      Boolean              @default(false) // オープンキャンパス参加
+  applicationRequirements String?              @db.Text // 出願条件
+  declinePolicy           String? // 合格時の辞退可否: "可" / "不可" / "専願"
+  needsMotivationLetter   Boolean              @default(false) // 志望理由書の要否
+  needsSelfRecommendation Boolean              @default(false) // 自己推薦書の要否
+  needsActivityReport     Boolean              @default(false) // 活動報告書の要否
+  otherDocuments          String?              @db.Text // その他必要書類の詳細
+  applicationDeadline     DateTime? // 出願期限
+  deadlineType            String? // "必着" / "消印有効"
   mentorSubmissionDueDate DateTime? // 講師への提出予定日
-  progressStatus        String  @default("準備中") // 未着手/準備中/提出済/選考中/合格/不合格/辞退 等
-  progressNote           String? @db.Text // 進捗状況の補足メモ
-  milestones       Milestone[]
-  tasks            Task[]
+  progressStatus          String               @default("準備中") // 未着手/準備中/提出済/選考中/合格/不合格/辞退 等
+  progressNote            String?              @db.Text // 進捗状況の補足メモ
+  milestones              Milestone[]
+  tasks                   Task[]
+  documents               Document[]
+  resources               UniversityResource[]
 
   @@index([studentProfileId])
+}
+
+model UniversityResource {
+  id             String     @id @default(cuid())
+  universityId   String
+  university     University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  title          String
+  kind           String     @default("募集要項")
+  url            String     @db.Text
+  admissionYear  String?
+  lastVerifiedAt DateTime?
+  notes          String?    @db.Text
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([universityId, kind])
 }
 
 model Milestone {
@@ -212,8 +230,12 @@ model Milestone {
   university       University?    @relation(fields: [universityId], references: [id], onDelete: Cascade)
   title            String
   date             DateTime
-  status           String         // "TODO", "DONE"
-  type             String         // "書類提出", "面接"
+  status           String // "TODO", "DONE"
+  type             String // "書類提出", "面接"
+  sourceKind       String         @default("MANUAL") // MANUAL / ADMISSION / TASK_DERIVED
+  sourceKey        String?        @unique // 外部項目との冪等同期用
+  deadlineRule     String? // 必着 / 消印有効 / 該当なし
+  notes            String?        @db.Text
 
   @@index([studentProfileId])
   @@index([universityId])
@@ -228,7 +250,7 @@ model Task {
   title            String
   dueDate          DateTime?
   completed        Boolean        @default(false)
-  type             String         // "DOCUMENT", "TODO"
+  type             String // "DOCUMENT", "TODO"
   progress         Int            @default(0) // 0-100% for documents
   isSelfCreated    Boolean        @default(false) // 生徒自身が作成したタスクかどうか
   // 演習課題の割当元（問題バンク）。該当問題の添削提出で自動完了する
@@ -248,8 +270,8 @@ model TaskComment {
   taskId     String
   task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   content    String
-  authorId   String   // userId (メンターまたは生徒)
-  authorName String   // キャッシュ用（API呼び出しを減らすため）
+  authorId   String // userId (メンターまたは生徒)
+  authorName String // キャッシュ用（API呼び出しを減らすため）
   authorRole String   @default("MENTOR") // "STUDENT" / "MENTOR" — 要返信バッジ判定用
   createdAt  DateTime @default(now())
 
@@ -260,7 +282,7 @@ model TaskTemplate {
   id        String         @id @default(cuid())
   tenantId  String
   tenant    Tenant         @relation(fields: [tenantId], references: [id])
-  name      String         // "早慶 総合型", "指定校推薦" など
+  name      String // "早慶 総合型", "指定校推薦" など
   items     TemplateItem[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -273,8 +295,8 @@ model TemplateItem {
   templateId String
   template   TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   title      String
-  type       String       // "TODO", "DOCUMENT"
-  daysOffset Int          // 追加日からの相対日数（例: 7日後）
+  type       String // "TODO", "DOCUMENT"
+  daysOffset Int // 追加日からの相対日数（例: 7日後）
 
   @@index([templateId])
 }
@@ -285,8 +307,8 @@ model ActivityLog {
   tenant           Tenant          @relation(fields: [tenantId], references: [id])
   studentProfileId String?
   studentProfile   StudentProfile? @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  action           String          // "TASK_COMPLETED", "DOCUMENT_ADDED", "COMMENT_ADDED"
-  details          String          // 内容の説明
+  action           String // "TASK_COMPLETED", "DOCUMENT_ADDED", "COMMENT_ADDED"
+  details          String // 内容の説明
   createdAt        DateTime        @default(now())
 
   @@index([tenantId, createdAt])
@@ -294,42 +316,76 @@ model ActivityLog {
 }
 
 model Document {
-  id               String         @id @default(cuid())
+  id               String             @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  studentProfile   StudentProfile     @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  universityId     String?
+  university       University?        @relation(fields: [universityId], references: [id], onDelete: SetNull)
   title            String
-  url              String?        // Google Docs/Drive url
-  type             String         // "志望理由書", "活動報告書", "その他"
-  dueDate          DateTime?      // 提出期限（提出年月日）
-  content          String?        @db.Text
-  isInternal       Boolean        @default(false)
-  isArchived       Boolean        @default(false)
-  status           String         @default("DRAFT") // "DRAFT"(下書き) "SUBMITTED"(生徒提出済) "REVIEWING"(レビュー中) "DONE"(完了)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  url              String? // Google Docs/Drive url
+  type             String // "志望理由書", "活動報告書", "その他"
+  dueDate          DateTime? // 提出期限（提出年月日）
+  content          String?            @db.Text
+  prompt           String?            @db.Text
+  requirements     String?            @db.Text
+  charLimit        Int?
+  isInternal       Boolean            @default(false)
+  isArchived       Boolean            @default(false)
+  status           String             @default("DRAFT") // "DRAFT"(下書き) "SUBMITTED"(生徒提出済) "REVIEWING"(レビュー中) "DONE"(完了)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  revisions        DocumentRevision[]
 
   @@index([studentProfileId, isArchived])
+  @@index([universityId])
+}
+
+model DocumentRevision {
+  id              String             @id @default(cuid())
+  documentId      String
+  document        Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revisionNumber  Int
+  content         String             @db.Text
+  source          String             @default("MANUAL")
+  createdByUserId String?
+  createdAt       DateTime           @default(now())
+  reviews         DocumentAIReview[]
+
+  @@unique([documentId, revisionNumber])
+  @@index([documentId, createdAt])
+}
+
+model DocumentAIReview {
+  id              String           @id @default(cuid())
+  revisionId      String
+  revision        DocumentRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  feedback        String           @db.Text
+  model           String?
+  createdByUserId String
+  createdAt       DateTime         @default(now())
+
+  @@index([revisionId, createdAt])
 }
 
 model PracticeRecord {
-  id               String         @id @default(cuid())
+  id               String           @id @default(cuid())
   studentProfileId String
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  type             String         // "小論文", "志望理由書"
-  prompt           String         // 設問
-  answer           String         // 生徒の解答
-  score            Int?           // AI採点スコア
-  feedback         String         // AIフィードバック
+  studentProfile   StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  type             String // "小論文", "志望理由書"
+  prompt           String // 設問
+  answer           String // 生徒の解答
+  score            Int? // AI採点スコア
+  feedback         String // AIフィードバック
   // 解いた問題バンクの問題（カスタム設問はnull）。スコア推移・再提出のグルーピングに使う
   questionBankId   String?
-  questionBank     QuestionBank?  @relation(fields: [questionBankId], references: [id], onDelete: SetNull)
+  questionBank     QuestionBank?    @relation(fields: [questionBankId], references: [id], onDelete: SetNull)
   // 面接の深掘り（2ターン目以降）の親記録
   parentRecordId   String?
-  parentRecord     PracticeRecord? @relation("PracticeFollowUp", fields: [parentRecordId], references: [id], onDelete: SetNull)
+  parentRecord     PracticeRecord?  @relation("PracticeFollowUp", fields: [parentRecordId], references: [id], onDelete: SetNull)
   followUps        PracticeRecord[] @relation("PracticeFollowUp")
   // 生徒/講師による非表示（ソフトデリート。物理削除はしない）
-  isArchived       Boolean        @default(false)
-  createdAt        DateTime       @default(now())
+  isArchived       Boolean          @default(false)
+  createdAt        DateTime         @default(now())
 
   @@index([studentProfileId])
   @@index([studentProfileId, questionBankId])
@@ -356,11 +412,11 @@ model LessonLog {
   id               String         @id @default(cuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  authorUserId     String?        // 記載講師のUser ID
-  authorName       String         // 記載講師名（表示用キャッシュ）
-  lessonDate       DateTime       // 授業日
-  startTime        String?        // "14:00"
-  endTime          String?        // "15:30"
+  authorUserId     String? // 記載講師のUser ID
+  authorName       String // 記載講師名（表示用キャッシュ）
+  lessonDate       DateTime // 授業日
+  startTime        String? // "14:00"
+  endTime          String? // "15:30"
   content          String         @db.Text // 授業でやったこと
   homework         String?        @db.Text // 宿題
   nextPlan         String?        @db.Text // 次回授業の予定
@@ -375,29 +431,29 @@ model LessonLog {
 // AI添削（志望理由書・面接）で「この生徒の原体験・価値観・将来像」を文脈として参照する。
 // 生徒本人も編集でき、メンターも編集できる（1生徒1レコード）。
 model StudentSelfProfile {
-  id               String         @id @default(cuid())
-  studentProfileId String         @unique
-  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  id                  String         @id @default(cuid())
+  studentProfileId    String         @unique
+  studentProfile      StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   // 自己分析
-  passions         String?        @db.Text // 夢中になったこと・熱中した経験
-  happyMoments     String?        @db.Text // 幸せ・充実を感じた瞬間
-  contributions    String?        @db.Text // 貢献した活動・人の役に立った経験
-  strengths        String?        @db.Text // 強み・長所
-  weaknesses       String?        @db.Text // 弱み・課題
-  values           String?        @db.Text // 大切にしている価値観
-  interests        String?        @db.Text // 興味・関心のある学問分野
-  turningPoints    String?        @db.Text // 原体験・転機
+  passions            String?        @db.Text // 夢中になったこと・熱中した経験
+  happyMoments        String?        @db.Text // 幸せ・充実を感じた瞬間
+  contributions       String?        @db.Text // 貢献した活動・人の役に立った経験
+  strengths           String?        @db.Text // 強み・長所
+  weaknesses          String?        @db.Text // 弱み・課題
+  values              String?        @db.Text // 大切にしている価値観
+  interests           String?        @db.Text // 興味・関心のある学問分野
+  turningPoints       String?        @db.Text // 原体験・転機
   // 将来ビジョン
-  visionAge20      String?        @db.Text // 20歳時点の理想（進路・活動）
-  visionAge30      String?        @db.Text // 30歳時点の理想（仕事・生き方）
-  visionAge40      String?        @db.Text // 40歳時点の理想（社会での役割）
-  careerGoal       String?        @db.Text // 将来就きたい職業・成し遂げたいこと
-  admissionAxis    String?        @db.Text // 志望理由の軸（課題意識・解決したい社会課題）
+  visionAge20         String?        @db.Text // 20歳時点の理想（進路・活動）
+  visionAge30         String?        @db.Text // 30歳時点の理想（仕事・生き方）
+  visionAge40         String?        @db.Text // 40歳時点の理想（社会での役割）
+  careerGoal          String?        @db.Text // 将来就きたい職業・成し遂げたいこと
+  admissionAxis       String?        @db.Text // 志望理由の軸（課題意識・解決したい社会課題）
   // 外部診断ツール(lp.p-quest.com)の結果を記録（AI添削でも本人理解の材料として参照）
-  learningStyleResult String?     @db.Text // 学習スタイル診断の結果
-  aptitudeResult      String?     @db.Text // 進路発見チャートの結果（向いている学部・進路タイプ）
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  learningStyleResult String?        @db.Text // 学習スタイル診断の結果
+  aptitudeResult      String?        @db.Text // 進路発見チャートの結果（向いている学部・進路タイプ）
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 }
 
 model Course {
@@ -411,16 +467,16 @@ model Course {
 }
 
 model Lesson {
-  id          String       @id @default(cuid())
-  courseId    String
-  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  title       String
-  content     String       @db.Text
-  overview    String?      @db.Text
-  order       Int          @default(0)
-  steps       LessonStep[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id        String       @id @default(cuid())
+  courseId  String
+  course    Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  content   String       @db.Text
+  overview  String?      @db.Text
+  order     Int          @default(0)
+  steps     LessonStep[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@index([courseId])
 }
@@ -448,15 +504,15 @@ model LessonStep {
 }
 
 model StepAnswer {
-  id               String          @id @default(cuid())
+  id               String         @id @default(cuid())
   stepId           String
-  step             LessonStep      @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  step             LessonStep     @relation(fields: [stepId], references: [id], onDelete: Cascade)
   studentProfileId String
-  studentProfile   StudentProfile  @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  content          String          @db.Text
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  content          String         @db.Text
   feedbacks        AIFeedback[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@unique([stepId, studentProfileId])
   @@index([studentProfileId])
@@ -474,23 +530,23 @@ model AIFeedback {
 }
 
 model QuestionBank {
-  id                String   @id @default(cuid())
-  tenantId          String?  // null = 全テナント共通（運営提供）。値あり = そのテナント専用（AI生成問題など）
+  id                String           @id @default(cuid())
+  tenantId          String? // null = 全テナント共通（運営提供）。値あり = そのテナント専用（AI生成問題など）
   category          String
   title             String
-  prompt            String   @db.Text
-  source            String   @default("MANUAL") // "MANUAL" / "AI_GENERATED" / "NOTEBOOKLM" / "CUSTOM"
-  university        String?  // 過去問傾向の対象大学（AI生成時）
-  fieldCategory     String?  // 正規化済み系統ラベル（field-category.tsの10系統）
-  status            String   @default("ACTIVE") // "ACTIVE" / "PENDING"(承認待ち) / "ARCHIVED"(非表示)
-  createdByUserId   String?  // 追加したユーザーID（生徒投稿の承認判断・監査用）
-  followUpQuestions String?  @db.Text // 面接の深掘り質問（1行1問。modelAnswerから分離）
-  difficulty        String?  // 難易度（基礎/標準/発展など）
-  modelAnswer       String?  @db.Text // 模範解答の要点・採点ポイント（メンター/採点参照用）
+  prompt            String           @db.Text
+  source            String           @default("MANUAL") // "MANUAL" / "AI_GENERATED" / "NOTEBOOKLM" / "CUSTOM"
+  university        String? // 過去問傾向の対象大学（AI生成時）
+  fieldCategory     String? // 正規化済み系統ラベル（field-category.tsの10系統）
+  status            String           @default("ACTIVE") // "ACTIVE" / "PENDING"(承認待ち) / "ARCHIVED"(非表示)
+  createdByUserId   String? // 追加したユーザーID（生徒投稿の承認判断・監査用）
+  followUpQuestions String?          @db.Text // 面接の深掘り質問（1行1問。modelAnswerから分離）
+  difficulty        String? // 難易度（基礎/標準/発展など）
+  modelAnswer       String?          @db.Text // 模範解答の要点・採点ポイント（メンター/採点参照用）
   practiceRecords   PracticeRecord[]
   tasks             Task[]
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@index([tenantId])
   @@index([category, status])

@@ -18,7 +18,8 @@ export default async function StudentDocumentPage({ params }: { params: { docId:
   }
 
   const document = await prisma.document.findUnique({
-    where: { id: params.docId, studentProfileId: studentProfile.id }
+    where: { id: params.docId, studentProfileId: studentProfile.id },
+    include: { revisions: { orderBy: { revisionNumber: "desc" }, include: { reviews: { orderBy: { createdAt: "desc" } } } } }
   });
 
   if (!document || !document.isInternal) {
@@ -27,7 +28,7 @@ export default async function StudentDocumentPage({ params }: { params: { docId:
 
   return (
     <div className="px-4 w-full">
-      <DocumentEditor document={document} backUrl={`/portal`} />
+      <DocumentEditor document={document} backUrl={`/portal`} isMentorView={false} />
     </div>
   );
 }

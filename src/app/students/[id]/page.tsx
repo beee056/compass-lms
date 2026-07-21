@@ -17,12 +17,21 @@ import LessonLogSection from "@/components/LessonLogSection";
 import AdmissionTrackerSection from "@/components/AdmissionTrackerSection";
 import SelfProfileSection from "@/components/SelfProfileSection";
 import ShareLinkManager from "@/components/ShareLinkManager";
+import { buildDerivedAdmissionMilestones } from "@/lib/admission-milestones";
+import { StudentPathTabs } from "@/components/student-path-tabs";
+import UniversityResourcesSection from "@/components/UniversityResourcesSection";
 
 // AI添削・問題生成（このページから呼ばれるServer Action）が
 // Vercelの既定タイムアウトを超えないよう上限を延長
 export const maxDuration = 60;
 
-export default async function StudentDetailPage({ params }: { params: { id: string } }) {
+export default async function StudentDetailPage({
+  params,
+  searchParams
+}: {
+  params: { id: string };
+  searchParams?: { university?: string };
+}) {
   const user = await getCurrentUser();
   // 生徒は「自分の生徒ページ」だけ閲覧できる（メンターとURLを共有できる）。
   // 他の生徒のページを開こうとした場合は自分のページ（無ければポータル）へ戻す。
@@ -56,7 +65,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         ...(restrictedIds ? { id: { in: restrictedIds } } : {})
       },
       include: {
-        universities: true,
+        universities: { include: { resources: { orderBy: [{ kind: "asc" }, { createdAt: "desc" }] } } },
         documents: { orderBy: { updatedAt: 'desc' } },
         tasks: {
           include: { comments: { orderBy: { createdAt: 'asc' } } },
@@ -92,7 +101,6 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     id: dbStudent.id,
     name: dbStudent.name,
     initial: dbStudent.name.charAt(0),
-    phase: dbStudent.phase,
     universities: dbStudent.universities,
     driveUrl: dbStudent.driveFolderUrl,
     documents: dbStudent.documents,
@@ -116,8 +124,14 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
       title: t.title,
       date: new Date(t.dueDate),
       status: "TODO",
-      type: "タスク期限"
+      type: "タスク期限",
+      universityId: t.universityId ?? null
     }));
+
+  const admissionMilestones = buildDerivedAdmissionMilestones(
+    student.universities,
+    student.milestones.map((milestone: any) => milestone.sourceKey)
+  );
 
   const combinedMilestones = [
     ...student.milestones.map((m: any) => ({
@@ -125,8 +139,11 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
       title: m.title,
       date: new Date(m.date),
       status: m.status,
-      type: m.type
+      type: m.type,
+      universityId: m.universityId ?? null,
+      sourceKey: m.sourceKey ?? null
     })),
+    ...admissionMilestones,
     ...taskMilestones
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -134,8 +151,26 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
   const safeStudent = JSON.parse(JSON.stringify(student));
   const safeCombinedMilestones = JSON.parse(JSON.stringify(combinedMilestones));
 
-  // flat strings for DocumentList prop
-  const flatUniversities = safeStudent.universities.map((u: any) => `${u.name} ${u.department}`);
+  const universityOptions = safeStudent.universities.map((university: any) => ({
+    id: university.id,
+    label: `${university.name} ${university.department}`
+  }));
+  const requestedUniversityId = searchParams?.university ?? null;
+  const selectedUniversityId = safeStudent.universities.some((university: any) => university.id === requestedUniversityId)
+    ? requestedUniversityId
+    : null;
+  const visibleDocuments = selectedUniversityId
+    ? safeStudent.documents.filter((document: any) => document.universityId === selectedUniversityId)
+    : safeStudent.documents;
+  const visibleTasks = selectedUniversityId
+    ? safeStudent.tasks.filter((task: any) => task.universityId === selectedUniversityId)
+    : safeStudent.tasks;
+  const visibleMilestones = selectedUniversityId
+    ? safeCombinedMilestones.filter((milestone: any) => milestone.universityId === selectedUniversityId)
+    : safeCombinedMilestones;
+  const visibleUniversities = selectedUniversityId
+    ? safeStudent.universities.filter((university: any) => university.id === selectedUniversityId)
+    : safeStudent.universities;
 
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20">
@@ -149,9 +184,6 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
           <div>
             <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-4 tracking-tight">
               {safeStudent.name}
-              <Badge variant="outline" className="bg-indigo-50/50 text-indigo-600 border-indigo-200/60 px-3 py-1 font-semibold text-sm rounded-full">
-                {safeStudent.phase}
-              </Badge>
               {safeStudent.status === "ARCHIVED" && (
                 <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-300 px-3 py-1 font-semibold text-sm rounded-full">
                   卒業生
@@ -202,22 +234,30 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         </div>
       </div>
 
+      <StudentPathTabs
+        basePath={`/students/${safeStudent.id}`}
+        universities={safeStudent.universities}
+        selectedUniversityId={selectedUniversityId}
+      />
+
       {/* コンテンツグリッド */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
         <div className="xl:col-span-2 space-y-10">
+          <UniversityResourcesSection universities={visibleUniversities as any[]} isMentorView={!isStudentViewer} />
+
           {/* Documents Section */}
           <DocumentList
             studentId={safeStudent.id}
             driveUrl={safeStudent.driveUrl}
-            initialDocuments={safeStudent.documents as any[]}
-            universities={flatUniversities}
+            initialDocuments={visibleDocuments as any[]}
+            universities={universityOptions}
             isStudent={isStudentViewer}
           />
 
           {/* Tasks Section */}
           <TaskSection
             studentId={safeStudent.id}
-            initialTasks={safeStudent.tasks as any[]}
+            initialTasks={visibleTasks as any[]}
             isStudent={isStudentViewer}
           />
 
@@ -241,7 +281,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
 
           {/* 入試状況（出願管理） */}
           <AdmissionTrackerSection
-            universities={safeStudent.universities as any[]}
+            universities={visibleUniversities as any[]}
             isMentorView={!isStudentViewer}
           />
         </div>
@@ -250,8 +290,9 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         <div className="space-y-8">
           <MilestoneSection
             studentId={safeStudent.id}
-            initialMilestones={safeCombinedMilestones as any[]}
+            initialMilestones={visibleMilestones as any[]}
             isStudent={isStudentViewer}
+            universities={universityOptions}
           />
 
           {!isStudentViewer && <ShareLinkManager studentId={safeStudent.id} links={shareLinks} />}

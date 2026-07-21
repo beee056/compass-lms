@@ -94,23 +94,6 @@ export default function AddStudentDialog({ className }: { className?: string }) 
               <Input id="studentEmail" name="studentEmail" type="email" placeholder="例: student@example.com" className="border-slate-200" />
               <p className="text-xs text-slate-500">※生徒がこのアドレスでサインアップすると、自動的に紐付きます。</p>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="phase" className="text-slate-700 font-semibold text-sm">現在のフェーズ</Label>
-              <Input 
-                id="phase" 
-                name="phase" 
-                defaultValue="自己分析" 
-                placeholder="フェーズを入力..." 
-                list="phase-options"
-                className="border-slate-200" 
-              />
-              <datalist id="phase-options">
-                <option value="自己分析" />
-                <option value="書類作成" />
-                <option value="面接対策" />
-                <option value="直前期" />
-              </datalist>
-            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">

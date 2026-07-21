@@ -17,6 +17,7 @@ async function acceptMentorInvite(
   invite: { id: string; tenantId: string; grantFullAccess: boolean; studentIds: string[] },
   previousTenantId: string | null
 ) {
+  // 合流本体は必ず成立させる（トランザクション内で完結させ、抜け殻の片付けは分離する）
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
@@ -29,15 +30,26 @@ async function acceptMentorInvite(
       });
     }
     await tx.tenantInvite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } });
-
-    // 元のテナントが自分が作った抜け殻（自動作成されたが誰も使わなかった）なら片付ける
-    if (previousTenantId && previousTenantId !== invite.tenantId) {
-      const previous = await tx.tenant.findUnique({ where: { id: previousTenantId }, select: { ownerEmail: true } });
-      if (previous?.ownerEmail === email) {
-        await tx.tenant.delete({ where: { id: previousTenantId } }).catch(() => {});
-      }
-    }
   });
+
+  // 元テナントが自分が作った抜け殻なら片付ける（ベストエフォート。失敗しても合流は成立済み）。
+  // ActivityLog等の参照があるとテナント削除がFKで失敗するため、参照ごと消してから削除する。
+  if (previousTenantId && previousTenantId !== invite.tenantId) {
+    try {
+      const previous = await prisma.tenant.findUnique({
+        where: { id: previousTenantId },
+        select: { ownerEmail: true, _count: { select: { students: true, users: true } } }
+      });
+      if (previous?.ownerEmail === email && previous._count.students === 0 && previous._count.users === 0) {
+        await prisma.activityLog.deleteMany({ where: { tenantId: previousTenantId } });
+        await prisma.taskTemplate.deleteMany({ where: { tenantId: previousTenantId } });
+        await prisma.tenantInvite.deleteMany({ where: { tenantId: previousTenantId } });
+        await prisma.tenant.delete({ where: { id: previousTenantId } });
+      }
+    } catch (cleanupError) {
+      console.error("抜け殻テナントの片付けに失敗（合流は成立済み）:", cleanupError);
+    }
+  }
 }
 
 // ユーザーのテナント紐付け（プロビジョニング）を「冪等」に行う。

@@ -15,6 +15,7 @@ import ActivityLogSection from "@/components/ActivityLogSection";
 import PracticeSection from "@/components/PracticeSection";
 import LessonLogSection from "@/components/LessonLogSection";
 import AdmissionTrackerSection from "@/components/AdmissionTrackerSection";
+import SelfProfileSection from "@/components/SelfProfileSection";
 import ShareLinkManager from "@/components/ShareLinkManager";
 
 // AI添削・問題生成（このページから呼ばれるServer Action）が
@@ -63,7 +64,8 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
         },
         milestones: { orderBy: { date: 'asc' } },
         practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } },
-        lessonLogs: { orderBy: { lessonDate: 'desc' }, take: 100 }
+        lessonLogs: { orderBy: { lessonDate: 'desc' }, take: 100 },
+        selfProfile: true
       }
     }),
     getTemplates(),
@@ -98,6 +100,7 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
     milestones: dbStudent.milestones,
     practiceRecords: dbStudent.practiceRecords,
     lessonLogs: dbStudent.lessonLogs,
+    selfProfile: dbStudent.selfProfile,
     highSchool: dbStudent.highSchool || "",
     grade: dbStudent.grade || "",
     phone: dbStudent.phone || "",
@@ -232,6 +235,9 @@ export default async function StudentDetailPage({ params }: { params: { id: stri
             initialLogs={safeStudent.lessonLogs as any[]}
             isMentorView={!isStudentViewer}
           />
+
+          {/* 自己分析・将来ビジョン */}
+          <SelfProfileSection studentId={safeStudent.id} profile={safeStudent.selfProfile} />
 
           {/* 入試状況（出願管理） */}
           <AdmissionTrackerSection

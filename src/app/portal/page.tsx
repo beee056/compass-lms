@@ -9,6 +9,7 @@ import MilestoneSection from "@/components/MilestoneSection";
 import PracticeSection from "@/components/PracticeSection";
 import LessonLogSection from "@/components/LessonLogSection";
 import AdmissionTrackerSection from "@/components/AdmissionTrackerSection";
+import SelfProfileSection from "@/components/SelfProfileSection";
 import TenantStatusNotice from "@/components/TenantStatusNotice";
 
 // AI添削（このページから呼ばれるServer Action）がタイムアウトしないよう上限を延長
@@ -46,7 +47,8 @@ export default async function StudentPortalPage() {
       tasks: { orderBy: { dueDate: 'asc' } },
       milestones: { orderBy: { date: 'asc' } },
       practiceRecords: { where: { isArchived: false }, orderBy: { createdAt: 'desc' } },
-        lessonLogs: { orderBy: { lessonDate: 'desc' }, take: 100 }
+        lessonLogs: { orderBy: { lessonDate: 'desc' }, take: 100 },
+        selfProfile: true
     }
   });
 
@@ -71,6 +73,7 @@ export default async function StudentPortalPage() {
     milestones: dbStudent.milestones,
     practiceRecords: dbStudent.practiceRecords,
     lessonLogs: dbStudent.lessonLogs,
+    selfProfile: dbStudent.selfProfile,
     highSchool: sData.highSchool || "",
     grade: sData.grade || "",
     phone: sData.phone || "",
@@ -166,6 +169,9 @@ export default async function StudentPortalPage() {
             studentId={safeStudent.id}
             initialLogs={safeStudent.lessonLogs as any[]}
           />
+
+          {/* 自己分析・将来ビジョン（生徒本人が記入） */}
+          <SelfProfileSection studentId={safeStudent.id} profile={safeStudent.selfProfile} />
 
           {/* 入試状況（出願管理・生徒は閲覧のみ） */}
           <AdmissionTrackerSection universities={safeStudent.universities as any[]} />

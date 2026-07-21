@@ -167,6 +167,7 @@ model StudentProfile {
   sharedTokens   SharedAccessToken[]
   lessonLogs     LessonLog[]
   studentMentorAccess StudentMentorAccess[]
+  selfProfile    StudentSelfProfile?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -368,6 +369,32 @@ model LessonLog {
   updatedAt        DateTime       @updatedAt
 
   @@index([studentProfileId, lessonDate])
+}
+
+// 生徒の自己分析・将来ビジョン（旧管理シート「基本データ」の自己分析欄に対応）。
+// AI添削（志望理由書・面接）で「この生徒の原体験・価値観・将来像」を文脈として参照する。
+// 生徒本人も編集でき、メンターも編集できる（1生徒1レコード）。
+model StudentSelfProfile {
+  id               String         @id @default(cuid())
+  studentProfileId String         @unique
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  // 自己分析
+  passions         String?        @db.Text // 夢中になったこと・熱中した経験
+  happyMoments     String?        @db.Text // 幸せ・充実を感じた瞬間
+  contributions    String?        @db.Text // 貢献した活動・人の役に立った経験
+  strengths        String?        @db.Text // 強み・長所
+  weaknesses       String?        @db.Text // 弱み・課題
+  values           String?        @db.Text // 大切にしている価値観
+  interests        String?        @db.Text // 興味・関心のある学問分野
+  turningPoints    String?        @db.Text // 原体験・転機
+  // 将来ビジョン
+  visionAge20      String?        @db.Text // 20歳時点の理想（進路・活動）
+  visionAge30      String?        @db.Text // 30歳時点の理想（仕事・生き方）
+  visionAge40      String?        @db.Text // 40歳時点の理想（社会での役割）
+  careerGoal       String?        @db.Text // 将来就きたい職業・成し遂げたいこと
+  admissionAxis    String?        @db.Text // 志望理由の軸（課題意識・解決したい社会課題）
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
 
 model Course {

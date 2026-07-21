@@ -127,10 +127,12 @@ export default function MentorCommandCenter({
     .sort((a, b) => getDaysUntil(a.dueDate) - getDaysUntil(b.dueDate));
   const urgentTasks = upcomingTasks.filter((task) => getDaysUntil(task.dueDate) <= 2);
   const weekTasks = upcomingTasks.filter((task) => getDaysUntil(task.dueDate) <= 7);
-  const upcomingMilestones = milestones
+  const upcomingMilestonesAll = milestones
     .filter((milestone) => getDaysUntil(milestone.date) >= 0)
-    .sort((a, b) => getDaysUntil(a.date) - getDaysUntil(b.date))
-    .slice(0, 3);
+    .sort((a, b) => getDaysUntil(a.date) - getDaysUntil(b.date));
+  const MILESTONE_PREVIEW = 8;
+  const upcomingMilestones = upcomingMilestonesAll.slice(0, MILESTONE_PREVIEW);
+  const milestoneOverflow = upcomingMilestonesAll.length - upcomingMilestones.length;
   const selectedStudent =
     activeStudents.find((student) =>
       upcomingTasks.some((task) => task.studentProfileId === student.id)
@@ -276,7 +278,7 @@ export default function MentorCommandCenter({
             />
             <MetricCard
               label="直近予定"
-              value={`${upcomingMilestones.length}`}
+              value={`${upcomingMilestonesAll.length}`}
               detail="次のマイルストーン"
               icon={Target}
               tone="text-[#e7a72e]"
@@ -381,19 +383,29 @@ export default function MentorCommandCenter({
               <div className="p-5 text-sm font-semibold leading-6 text-slate-500">
                 直近のマイルストーンはありません。
                 <span className="mt-1 block text-xs font-medium text-slate-400">
-                  出願締切・面接日などの確定日程を生徒ページの「スケジュール」に登録すると、ここに表示されます（タスク期限は左の要介入キューに出ます）。
+                  出願締切・書類の提出期限などの日程を登録すると、ここに近い順で表示されます（タスク期限は左の要介入キューに出ます）。
                 </span>
               </div>
             ) : (
-              upcomingMilestones.map((milestone) => (
-                <div key={milestone.id} className="p-4">
-                  <p className="text-xs font-bold text-slate-500">{formatDate(milestone.date)}</p>
-                  <p className="mt-1 line-clamp-2 text-sm font-black">{milestone.title}</p>
-                  <p className="mt-1 text-xs font-bold text-[#3346a3]">
-                    {milestone.studentProfile?.name ?? milestone.type}
-                  </p>
-                </div>
-              ))
+              <>
+                {upcomingMilestones.map((milestone) => (
+                  <div key={milestone.id} className="p-4">
+                    <p className="text-xs font-bold text-slate-500">{formatDate(milestone.date)}</p>
+                    <p className="mt-1 line-clamp-2 text-sm font-black">{milestone.title}</p>
+                    <p className="mt-1 text-xs font-bold text-[#3346a3]">
+                      {milestone.studentProfile?.name ?? milestone.type}
+                    </p>
+                  </div>
+                ))}
+                {milestoneOverflow > 0 && (
+                  <Link
+                    href="/schedule"
+                    className="block p-4 text-xs font-bold text-[#3346a3] transition-colors hover:bg-[#fbfcf8] hover:underline"
+                  >
+                    ＋ ほか {milestoneOverflow} 件を全体スケジュールで見る
+                  </Link>
+                )}
+              </>
             )}
           </div>
         </div>

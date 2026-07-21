@@ -14,25 +14,28 @@ interface EditTaskDialogProps {
     id: string;
     title: string;
     dueDate?: string | Date | null;
+    universityId?: string | null;
   };
+  universities?: { id: string; label: string }[];
   trigger?: React.ReactNode;
 }
 
-export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
+export default function EditTaskDialog({ task, universities = [], trigger }: EditTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState(task.title);
-  
+
   // yyyy-MM-dd に変換
   const defaultDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "";
   const [date, setDate] = useState(defaultDate);
+  const [universityId, setUniversityId] = useState(task.universityId ?? "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     startTransition(async () => {
-      const result = await updateTask(task.id, title, date || undefined);
+      const result = await updateTask(task.id, title, date || undefined, universityId || null);
       if (result.success) {
         toast.success("タスクを更新しました");
         setOpen(false);
@@ -77,14 +80,30 @@ export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="taskDate" className="text-slate-700 font-semibold text-sm">期日 (任意)</Label>
-              <Input 
-                id="taskDate" 
+              <Input
+                id="taskDate"
                 type="date"
-                value={date} 
-                onChange={(e) => setDate(e.target.value)} 
-                className="border-slate-200 text-slate-700" 
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="border-slate-200 text-slate-700"
               />
             </div>
+            {universities.length > 0 && (
+              <div className="grid gap-2">
+                <Label htmlFor="taskUniversity" className="text-slate-700 font-semibold text-sm">対象の志望校（タブの振り分け）</Label>
+                <select
+                  id="taskUniversity"
+                  value={universityId}
+                  onChange={(e) => setUniversityId(e.target.value)}
+                  className="h-11 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                >
+                  <option value="">全体（志望校の指定なし）</option>
+                  {universities.map((u) => (
+                    <option key={u.id} value={u.id}>{u.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">

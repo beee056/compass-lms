@@ -25,6 +25,7 @@ interface Task {
   dueDate: Date | null;
   completed: boolean;
   type: string;
+  universityId?: string | null;
   comments?: TaskComment[];
 }
 
@@ -32,9 +33,10 @@ interface TaskSectionProps {
   studentId: string;
   initialTasks: Task[];
   isStudent?: boolean;
+  universities?: { id: string; label: string }[];
 }
 
-export default function TaskSection({ studentId, initialTasks, isStudent = false }: TaskSectionProps) {
+export default function TaskSection({ studentId, initialTasks, isStudent = false, universities = [] }: TaskSectionProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -281,7 +283,7 @@ export default function TaskSection({ studentId, initialTasks, isStudent = false
                 </div>
                 {!isStudent && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <EditTaskDialog task={task} />
+                    <EditTaskDialog task={task} universities={universities} />
                     <button
                       onClick={() => setDeleteTargetId(task.id)}
                       className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:opacity-100"

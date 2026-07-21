@@ -2,12 +2,14 @@
 import { toast } from "@/lib/toast";
 
 import { useState, useTransition } from "react";
-import { Edit2, Loader2 } from "lucide-react";
-import { editUniversity } from "@/lib/actions";
+import { useRouter } from "next/navigation";
+import { Edit2, Loader2, Trash2 } from "lucide-react";
+import { editUniversity, deleteUniversity } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 
 interface EditUniversityDialogProps {
   university: {
@@ -18,10 +20,12 @@ interface EditUniversityDialogProps {
 }
 
 export default function EditUniversityDialog({ university }: EditUniversityDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [name, setName] = useState(university.name);
   const [department, setDepartment] = useState(university.department);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +38,20 @@ export default function EditUniversityDialog({ university }: EditUniversityDialo
         setOpen(false);
       } else {
         toast.error("志望校の更新に失敗しました: " + result.error);
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteUniversity(university.id);
+      if (result.success) {
+        toast.success("志望校を削除しました（書類・タスクは全体へ移動）");
+        setConfirmDelete(false);
+        setOpen(false);
+        router.refresh();
+      } else {
+        toast.error("志望校の削除に失敗しました: " + result.error);
       }
     });
   };
@@ -79,16 +97,38 @@ export default function EditUniversityDialog({ university }: EditUniversityDialo
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">
-              キャンセル
+          <DialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmDelete(true)}
+              disabled={isPending}
+              className="border-red-200 text-red-600 hover:bg-red-50 font-semibold gap-1.5"
+            >
+              <Trash2 className="h-4 w-4" />
+              削除
             </Button>
-            <Button type="submit" disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold min-w-[100px]">
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "更新する"}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-200 text-slate-600 font-semibold">
+                キャンセル
+              </Button>
+              <Button type="submit" disabled={isPending} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold min-w-[100px]">
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "更新する"}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="この志望校を削除しますか？"
+        description={`「${university.name} ${university.department}」のタブと、ひも付く募集要項・出願情報が削除されます。書類とタスクは「全体」タブへ移動して残ります。この操作は取り消せません。`}
+        confirmLabel="削除する"
+        destructive
+        onConfirm={handleDelete}
+      />
     </Dialog>
   );
 }

@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 interface UniversityOption {
@@ -112,17 +111,17 @@ export default function CreateDocumentButton({ studentId, universities }: { stud
             {/* 関連志望校の選択 */}
             <div className="grid gap-2">
               <Label htmlFor="selectedUni" className="text-slate-700 font-semibold text-sm">対象の志望校</Label>
-              <Select value={selectedUniversityId} onValueChange={(value) => setSelectedUniversityId(value ?? "common")}>
-                <SelectTrigger className="border-slate-200 bg-white">
-                  <SelectValue placeholder="志望校を選択" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="common">共通 (志望校の指定なし)</SelectItem>
-                  {universities.map((university) => (
-                    <SelectItem key={university.id} value={university.id}>{university.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                id="selectedUni"
+                value={selectedUniversityId}
+                onChange={(e) => setSelectedUniversityId(e.target.value)}
+                className="h-11 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"
+              >
+                <option value="common">共通 (志望校の指定なし)</option>
+                {universities.map((university) => (
+                  <option key={university.id} value={university.id}>{university.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* 書類種類の選択 */}

@@ -133,6 +133,18 @@ export default async function StudentDetailPage({
     student.milestones.map((milestone: any) => milestone.sourceKey)
   );
 
+  // 書類の提出期限もマイルストーン化（完了・アーカイブは除外）
+  const documentMilestones = student.documents
+    .filter((d: any) => !d.isArchived && d.dueDate && d.status !== "DONE")
+    .map((d: any) => ({
+      id: `doc-${d.id}`,
+      title: d.title,
+      date: new Date(d.dueDate),
+      status: "TODO",
+      type: "書類提出",
+      universityId: d.universityId ?? null
+    }));
+
   const combinedMilestones = [
     ...student.milestones.map((m: any) => ({
       id: m.id,
@@ -144,7 +156,8 @@ export default async function StudentDetailPage({
       sourceKey: m.sourceKey ?? null
     })),
     ...admissionMilestones,
-    ...taskMilestones
+    ...taskMilestones,
+    ...documentMilestones
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
   // Client Componentへの受け渡しのためシリアライズ (Dateオブジェクト対策)
@@ -259,6 +272,7 @@ export default async function StudentDetailPage({
             studentId={safeStudent.id}
             initialTasks={visibleTasks as any[]}
             isStudent={isStudentViewer}
+            universities={universityOptions}
           />
 
           {/* Practice Section */}

@@ -317,7 +317,7 @@ export async function getScheduleData() {
       : { tenantId: user.tenantId };
 
     // 全生徒（限定アクセス講師は割当済みの生徒のみ）のマイルストーン・出願日程・タスクを並列取得
-    const [storedMilestones, admissionSchedules, rawTasks] = await Promise.all([
+    const [storedMilestones, admissionSchedules, rawTasks, documentsWithDue] = await Promise.all([
       prisma.milestone.findMany({
         where: { studentProfile: studentFilter },
         include: { studentProfile: true },
@@ -345,6 +345,16 @@ export async function getScheduleData() {
           comments: { take: 1, orderBy: { createdAt: 'desc' }, select: { authorRole: true } }
         },
         orderBy: { dueDate: 'asc' }
+      }),
+      // 書類の提出期限もマイルストーン化（学校側が定めた提出日として扱う）。完了・アーカイブは除外
+      prisma.document.findMany({
+        where: {
+          studentProfile: studentFilter,
+          isArchived: false,
+          dueDate: { not: null },
+          NOT: { status: "DONE" }
+        },
+        include: { studentProfile: true }
       })
     ]);
 
@@ -387,7 +397,22 @@ export async function getScheduleData() {
       ];
     });
 
-    const milestones = [...storedMilestones, ...derivedMilestones].sort(
+    const documentMilestones = documentsWithDue.map((doc) => ({
+      id: `doc-${doc.id}`,
+      studentProfileId: doc.studentProfileId,
+      universityId: doc.universityId,
+      title: doc.title,
+      date: doc.dueDate as Date,
+      status: "TODO",
+      type: "書類提出",
+      sourceKind: "DOCUMENT",
+      sourceKey: null,
+      deadlineRule: null,
+      notes: null,
+      studentProfile: doc.studentProfile
+    }));
+
+    const milestones = [...storedMilestones, ...derivedMilestones, ...documentMilestones].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -498,7 +523,7 @@ export async function deleteTask(taskId: string) {
 }
 
 // タスク編集アクション
-export async function updateTask(taskId: string, title: string, dueDateStr?: string) {
+export async function updateTask(taskId: string, title: string, dueDateStr?: string, universityId?: string | null) {
   try {
     const user = await getCurrentUser();
     assertMentor(user);
@@ -507,12 +532,22 @@ export async function updateTask(taskId: string, title: string, dueDateStr?: str
 
     const adjustedDueDate = parseDueDate(dueDateStr);
 
+    const data: any = { title: validTitle, dueDate: adjustedDueDate };
+    if (universityId !== undefined) {
+      if (universityId) {
+        const uni = await findAuthorizedUniversity(user, universityId);
+        if (uni.studentProfileId !== task.studentProfileId) {
+          throw new ValidationError("選択した志望校がこの生徒に紐づいていません");
+        }
+        data.universityId = universityId;
+      } else {
+        data.universityId = null;
+      }
+    }
+
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
-      data: {
-        title: validTitle,
-        dueDate: adjustedDueDate
-      }
+      data
     });
 
     await addActivityLog("TASK_EDITED", `タスクの内容を「${validTitle}」に変更しました`, task.studentProfileId);
@@ -527,7 +562,7 @@ export async function updateTask(taskId: string, title: string, dueDateStr?: str
 }
 
 // ドキュメント更新アクション
-export async function updateDocument(documentId: string, title: string, dueDateStr?: string | null) {
+export async function updateDocument(documentId: string, title: string, dueDateStr?: string | null, universityId?: string | null) {
   try {
     const user = await getCurrentUser();
     const doc = await findAuthorizedDocument(user, documentId);
@@ -537,12 +572,23 @@ export async function updateDocument(documentId: string, title: string, dueDateS
 
     const oldTitle = doc.title;
 
+    // 志望校の振り分け（universityId を渡した場合のみ更新。空文字/null は「全体」へ）
+    const data: any = { title: validTitle, dueDate: adjustedDueDate };
+    if (universityId !== undefined) {
+      if (universityId) {
+        const uni = await findAuthorizedUniversity(user, universityId);
+        if (uni.studentProfileId !== doc.studentProfileId) {
+          throw new ValidationError("選択した志望校がこの生徒に紐づいていません");
+        }
+        data.universityId = universityId;
+      } else {
+        data.universityId = null;
+      }
+    }
+
     await prisma.document.update({
       where: { id: documentId },
-      data: {
-        title: validTitle,
-        dueDate: adjustedDueDate
-      }
+      data
     });
 
     if (oldTitle !== validTitle) {
@@ -870,6 +916,54 @@ export async function editUniversity(universityId: string, name: string, departm
     return { success: true, university: updatedUni };
   } catch (error: any) {
     console.error("Failed to edit university:", error);
+    return { success: false, error: toClientError(error) };
+  }
+}
+
+// 志望校の削除。配下の書類・タスク・手動マイルストーンは「全体」へ退避し（削除しない）、
+// 志望校本体と、そのひも付き資料・出願由来マイルストーンのみ削除する。
+export async function deleteUniversity(universityId: string) {
+  try {
+    const user = await getCurrentUser();
+    assertMentor(user);
+    const uni = await findAuthorizedUniversity(user, universityId);
+    const studentId = uni.studentProfileId;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.document.updateMany({ where: { universityId }, data: { universityId: null } });
+      await tx.task.updateMany({ where: { universityId }, data: { universityId: null } });
+      // 手動マイルストーンは全体へ退避。出願由来（ADMISSION）は志望校と一緒に削除させる
+      await tx.milestone.updateMany({ where: { universityId, sourceKind: "MANUAL" }, data: { universityId: null } });
+      // 資料(UniversityResource)と出願由来マイルストーンはFK cascadeで削除される
+      await tx.university.delete({ where: { id: universityId } });
+    });
+
+    await addActivityLog("UNIVERSITY_DELETED", `志望校「${uni.name} ${uni.department}」を削除しました（書類・タスクは全体へ移動）`, studentId);
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/");
+    revalidatePath("/schedule");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to delete university:", error);
+    return { success: false, error: toClientError(error) };
+  }
+}
+
+// ドキュメントの完全削除（アーカイブと異なり復元不可）。稿・AI添削はFK cascadeで削除される。
+export async function deleteDocument(documentId: string) {
+  try {
+    const user = await getCurrentUser();
+    assertMentor(user);
+    const doc = await findAuthorizedDocument(user, documentId);
+
+    await prisma.document.delete({ where: { id: documentId } });
+
+    await addActivityLog("DOCUMENT_DELETED", `書類「${doc.title}」を削除しました`, doc.studentProfileId);
+    revalidatePath(`/students/${doc.studentProfileId}`);
+    revalidatePath("/portal");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to delete document:", error);
     return { success: false, error: toClientError(error) };
   }
 }

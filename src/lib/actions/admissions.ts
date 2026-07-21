@@ -5,29 +5,16 @@ import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
 import { assertMentor, findAuthorizedUniversity, toClientError, ValidationError } from "../authz";
 import { startOfDayJST } from "../dates";
+import {
+  PROGRESS_STATUSES,
+  DECLINE_POLICIES,
+  DEADLINE_TYPES,
+  type AdmissionInput
+} from "../admissions-constants";
 
 // 出願管理（旧管理シート「入試状況」タブに対応）。
 // 大学ごとの出願実務（要否書類・期限・進捗）を記録する。生徒は閲覧のみ、編集はメンター専用。
 
-export interface AdmissionInput {
-  examName?: string;
-  openCampusAttended?: boolean;
-  applicationRequirements?: string;
-  declinePolicy?: string; // "可" | "不可" | "専願" | ""
-  needsMotivationLetter?: boolean;
-  needsSelfRecommendation?: boolean;
-  needsActivityReport?: boolean;
-  otherDocuments?: string;
-  applicationDeadline?: string; // "2026-09-01"
-  deadlineType?: string; // "必着" | "消印有効" | ""
-  mentorSubmissionDueDate?: string;
-  progressStatus?: string;
-  progressNote?: string;
-}
-
-export const PROGRESS_STATUSES = ["未着手", "準備中", "提出済", "選考中", "合格", "不合格", "辞退"] as const;
-const DECLINE_POLICIES = ["", "可", "不可", "専願"] as const;
-const DEADLINE_TYPES = ["", "必着", "消印有効"] as const;
 const MAX_TEXT = 2000;
 
 function parseOptionalDate(value?: string): Date | null | undefined {

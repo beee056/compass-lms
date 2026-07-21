@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { updateAdmission, PROGRESS_STATUSES, type AdmissionInput } from "@/lib/actions/admissions";
+import { updateAdmission } from "@/lib/actions/admissions";
+import { PROGRESS_STATUSES, type AdmissionInput } from "@/lib/admissions-constants";
 
 interface Admission {
   id: string;

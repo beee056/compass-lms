@@ -14,6 +14,8 @@ export interface SelfProfileInput {
   visionAge40?: string;
   careerGoal?: string;
   admissionAxis?: string;
+  learningStyleResult?: string;
+  aptitudeResult?: string;
 }
 
 export type SelfProfileField = keyof SelfProfileInput;
@@ -44,6 +46,13 @@ export const SELF_PROFILE_SECTIONS: Array<{
       { key: "visionAge20", label: "20歳時点の理想", placeholder: "大学での学び・活動の理想像" },
       { key: "visionAge30", label: "30歳時点の理想", placeholder: "仕事・生き方の理想像" },
       { key: "visionAge40", label: "40歳時点の理想", placeholder: "社会での役割・立ち位置の理想像" }
+    ]
+  },
+  {
+    group: "診断結果の記録（診断ツールの結果を貼り付け）",
+    fields: [
+      { key: "aptitudeResult", label: "進路発見チャートの結果", placeholder: "向いている学部・進路タイプなど、診断結果の要点を記録" },
+      { key: "learningStyleResult", label: "学習スタイル診断の結果", placeholder: "自分の学び方のタイプ・スコアなど、診断結果の要点を記録" }
     ]
   }
 ];
@@ -81,5 +90,7 @@ export const SELF_PROFILE_AI_LABELS: Record<SelfProfileField, string> = {
   admissionAxis: "志望理由の軸・課題意識",
   visionAge20: "20歳時点の理想",
   visionAge30: "30歳時点の理想",
-  visionAge40: "40歳時点の理想"
+  visionAge40: "40歳時点の理想",
+  aptitudeResult: "進路診断の結果（向いている学部・進路タイプ）",
+  learningStyleResult: "学習スタイル診断の結果"
 };

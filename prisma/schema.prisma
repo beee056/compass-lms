@@ -393,6 +393,9 @@ model StudentSelfProfile {
   visionAge40      String?        @db.Text // 40歳時点の理想（社会での役割）
   careerGoal       String?        @db.Text // 将来就きたい職業・成し遂げたいこと
   admissionAxis    String?        @db.Text // 志望理由の軸（課題意識・解決したい社会課題）
+  // 外部診断ツール(lp.p-quest.com)の結果を記録（AI添削でも本人理解の材料として参照）
+  learningStyleResult String?     @db.Text // 学習スタイル診断の結果
+  aptitudeResult      String?     @db.Text // 進路発見チャートの結果（向いている学部・進路タイプ）
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 }

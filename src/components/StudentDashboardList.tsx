@@ -29,26 +29,20 @@ type SortKey = "stale" | "recent" | "name";
 export default function StudentDashboardList({ initialStudents }: { initialStudents: StudentData[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
-  const [phaseFilter, setPhaseFilter] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<SortKey>("stale");
-
-  // 存在するフェーズの一覧（絞り込み用）
-  const phases = Array.from(new Set(initialStudents.map((s) => s.phase).filter(Boolean)));
 
   // フィルタリング
   const filteredStudents = initialStudents.filter((student) => {
     const matchStatus = student.status === statusFilter;
-    const matchPhase = phaseFilter === "ALL" || student.phase === phaseFilter;
 
     const q = searchQuery.toLowerCase();
     const matchQuery =
       student.name.toLowerCase().includes(q) ||
       student.universities.some((u) => u.toLowerCase().includes(q)) ||
       student.highSchool.toLowerCase().includes(q) ||
-      student.grade.toLowerCase().includes(q) ||
-      student.phase.toLowerCase().includes(q);
+      student.grade.toLowerCase().includes(q);
 
-    return matchStatus && matchPhase && matchQuery;
+    return matchStatus && matchQuery;
   });
 
   // 並び替え（更新が古い順＝停滞発見をデフォルトに）
@@ -96,19 +90,7 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
             </button>
           </div>
 
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:flex md:w-auto md:gap-4">
-            <select
-              value={phaseFilter}
-              onChange={(e) => setPhaseFilter(e.target.value)}
-              aria-label="フェーズで絞り込み"
-              className="h-11 w-full min-w-0 rounded-md border border-[#d8dee4] bg-[#fbfcf8] px-3 text-sm font-semibold text-slate-600 focus-visible:ring-[#3346a3]/30 md:w-auto"
-            >
-              <option value="ALL">すべてのフェーズ</option>
-              {phases.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-
+          <div className="grid w-full grid-cols-1 gap-3 md:flex md:w-auto md:gap-4">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -186,15 +168,12 @@ export default function StudentDashboardList({ initialStudents }: { initialStude
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50 relative z-10 pointer-events-none">
-                  <span className="rounded-md border border-[#d8dee4] bg-[#eef1ea] px-3 py-1 text-xs font-semibold text-[#3346a3]">
-                    {student.phase}
-                  </span>
+                <div className="flex items-center justify-end mt-auto pt-3 border-t border-slate-50 relative z-10 pointer-events-none">
                   <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <span>{student.lastUpdated}</span>
+                    <span>最終更新 {student.lastUpdated}</span>
                   </div>
                 </div>
               </Card>

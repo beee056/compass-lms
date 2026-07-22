@@ -32,7 +32,8 @@ export default function SignInPage() {
       }
       return;
     }
-    router.push("/");
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.push(next && next.startsWith("/") ? next : "/");
     router.refresh();
   }
 

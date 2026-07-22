@@ -17,6 +17,7 @@ import LessonLogSection from "@/components/LessonLogSection";
 import AdmissionTrackerSection from "@/components/AdmissionTrackerSection";
 import SelfProfileSection from "@/components/SelfProfileSection";
 import ShareLinkManager from "@/components/ShareLinkManager";
+import StudentInviteButton from "@/components/StudentInviteButton";
 import { buildDerivedAdmissionMilestones } from "@/lib/admission-milestones";
 import { StudentPathTabs } from "@/components/student-path-tabs";
 import UniversityResourcesSection from "@/components/UniversityResourcesSection";
@@ -308,6 +309,8 @@ export default async function StudentDetailPage({
             isStudent={isStudentViewer}
             universities={universityOptions}
           />
+
+          {!isStudentViewer && <StudentInviteButton studentId={safeStudent.id} isLinked={!!dbStudent.userId} />}
 
           {!isStudentViewer && <ShareLinkManager studentId={safeStudent.id} links={shareLinks} />}
 

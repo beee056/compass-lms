@@ -165,6 +165,7 @@ model StudentProfile {
   stepAnswers         StepAnswer[]
   logs                ActivityLog[]
   sharedTokens        SharedAccessToken[]
+  inviteTokens        StudentInviteToken[]
   lessonLogs          LessonLog[]
   studentMentorAccess StudentMentorAccess[]
   selfProfile         StudentSelfProfile?
@@ -400,6 +401,22 @@ model SharedAccessToken {
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   createdByUserId  String
   expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([studentProfileId])
+}
+
+// 生徒ポータルへの招待リンク（メールが分からなくても渡せる）。
+// リンクを開いた生徒がサインイン/登録すると、そのUserをこの生徒プロフィールに紐付ける。
+model StudentInviteToken {
+  id               String         @id @default(cuid())
+  token            String         @unique // 推測不能なランダム値
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  createdByUserId  String
+  expiresAt        DateTime
+  usedAt           DateTime?
   revokedAt        DateTime?
   createdAt        DateTime       @default(now())
 

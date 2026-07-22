@@ -35,6 +35,9 @@ export default function SignUpPage() {
     setDone(true);
   }
 
+  const nextParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+  const signInHref = nextParam && nextParam.startsWith("/") ? `/sign-in?next=${encodeURIComponent(nextParam)}` : "/sign-in";
+
   if (done) {
     return (
       <AuthShell title="確認メールを送信しました">
@@ -46,7 +49,7 @@ export default function SignUpPage() {
             <strong className="text-slate-800">{email}</strong> 宛に確認メールを送信しました。
             メール内のリンクを開くと登録が完了し、ログインできるようになります。
           </p>
-          <Link href="/sign-in" className="text-sm font-bold text-indigo-600 hover:underline">
+          <Link href={signInHref} className="text-sm font-bold text-indigo-600 hover:underline">
             ログイン画面へ
           </Link>
         </div>

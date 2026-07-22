@@ -2,14 +2,26 @@ import { LayoutGrid, Calendar, Settings, LogIn, BookOpen, Compass, MonitorPlay, 
 import Link from "next/link";
 import NavLink from "@/components/layout/NavLink";
 import AccountMenu from "@/components/layout/AccountMenu";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher";
+
+interface MembershipInfo {
+  tenantId: string;
+  tenantName: string;
+  hasFullTenantAccess: boolean;
+  isOwner: boolean;
+}
 
 export default async function Header() {
   // Better Auth のセッションから現在のユーザーを取得（未ログインなら null）
   let user: { name: string; email: string; role: string; isOperator: boolean } | null = null;
+  let memberships: MembershipInfo[] = [];
+  let activeTenantId = "";
   try {
     const { getCurrentUser } = await import("@/lib/actions");
     const u = await getCurrentUser();
     user = { name: u.name, email: u.email, role: u.role, isOperator: u.isOperator };
+    memberships = ((u as unknown as { memberships?: MembershipInfo[] }).memberships) ?? [];
+    activeTenantId = u.tenantId;
   } catch {
     user = null;
   }
@@ -75,6 +87,9 @@ export default async function Header() {
                   </NavLink>
                 )}
               </div>
+            )}
+            {user.role !== "STUDENT" && memberships.length > 0 && (
+              <WorkspaceSwitcher memberships={memberships} activeTenantId={activeTenantId} />
             )}
             <AccountMenu name={user.name} email={user.email} />
           </>

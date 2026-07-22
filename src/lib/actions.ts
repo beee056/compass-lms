@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { auth } from "./auth";
 import { provisionUser } from "./provision";
+import { ensureMembership, loadMemberships, type MembershipInfo } from "./memberships";
 import prisma from "./prisma";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "./email";
@@ -130,8 +131,52 @@ export async function getCurrentUser() {
     }
   }
 
+  // クロステナント: 非生徒はアクティブ塾の membership を保証し、所属集合を解決する。
+  // アクティブ塾が所属から外れていれば先頭へ矯正し、アクセス範囲を User キャッシュへ同期する。
+  let memberships: MembershipInfo[] = [];
+  if (user.role !== "STUDENT" && user.tenantId) {
+    await ensureMembership(user.id, user.tenantId, user.hasFullTenantAccess);
+    memberships = await loadMemberships(user.id, user.email);
+    const active = memberships.find((m) => m.tenantId === user.tenantId);
+    if (!active && memberships[0]) {
+      const first = memberships[0];
+      const nextTenant = await prisma.tenant.findUnique({ where: { id: first.tenantId } });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tenantId: first.tenantId, hasFullTenantAccess: first.hasFullTenantAccess }
+      });
+      user.tenantId = first.tenantId;
+      user.hasFullTenantAccess = first.hasFullTenantAccess;
+      user.tenant = nextTenant as typeof user.tenant;
+    } else if (active && user.hasFullTenantAccess !== active.hasFullTenantAccess) {
+      await prisma.user.update({ where: { id: user.id }, data: { hasFullTenantAccess: active.hasFullTenantAccess } });
+      user.hasFullTenantAccess = active.hasFullTenantAccess;
+    }
+  }
+
   // tenantId は上のガードで非nullが保証されるため、downstream向けに型を確定させる
-  return user as typeof user & { tenantId: string };
+  return Object.assign(user, { memberships }) as typeof user & { tenantId: string; memberships: MembershipInfo[] };
+}
+
+// アクティブな塾（ワークスペース）を、所属している別の塾へ切り替える。
+export async function switchTenant(tenantId: string) {
+  try {
+    const user = await getCurrentUser();
+    if (user.role === "STUDENT") throw new ValidationError("生徒はワークスペースを切り替えできません");
+    const membership = await prisma.tenantMembership.findUnique({
+      where: { userId_tenantId: { userId: user.id, tenantId } }
+    });
+    if (!membership) throw new ValidationError("このワークスペースへのアクセス権がありません");
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { tenantId, hasFullTenantAccess: membership.hasFullTenantAccess }
+    });
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to switch tenant:", error);
+    return { success: false, error: toClientError(error, "ワークスペースの切り替えに失敗しました") };
+  }
 }
 
 export async function getStudents() {

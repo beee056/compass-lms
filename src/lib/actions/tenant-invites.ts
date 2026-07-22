@@ -38,19 +38,28 @@ export async function getTenantInvites() {
         studentIds: true
       }
     });
-    // 同じワークスペースの現メンター一覧（アクセス範囲付き）も返す
-    const mentors = await prisma.user.findMany({
-      where: { tenantId: user.tenantId, role: { not: "STUDENT" } },
+    // 同じワークスペースに所属する現メンター一覧（membership 経由。アクセス範囲は membership の値）
+    const memberRows = await prisma.tenantMembership.findMany({
+      where: { tenantId: user.tenantId },
       orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-        hasFullTenantAccess: true,
-        studentAccess: { select: { studentProfileId: true } }
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentAccess: { select: { studentProfileId: true } }
+          }
+        }
       }
     });
+    const mentors = memberRows.map((m) => ({
+      id: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      hasFullTenantAccess: m.hasFullTenantAccess,
+      studentAccess: m.user.studentAccess
+    }));
     // 招待・生徒割当のUIで使う「自分がアクセスできる生徒一覧」（限定アクセス講師は自分の割当分のみ）
     const restrictedIds = await getRestrictedStudentIds(user);
     const students = await prisma.studentProfile.findMany({
@@ -106,9 +115,9 @@ export async function createTenantInvite(
       throw new ValidationError("フルアクセスにしない場合は、共有する生徒を1名以上選択してください");
     }
 
-    // 既に同テナントのメンバーなら不要
-    const existingMember = await prisma.user.findFirst({
-      where: { email: normalized, tenantId: user.tenantId },
+    // 既にこのワークスペースに所属している人には送らない（membership で判定）
+    const existingMember = await prisma.tenantMembership.findFirst({
+      where: { tenantId: user.tenantId, user: { email: normalized } },
       select: { id: true }
     });
     if (existingMember) throw new ValidationError("この方は既にこのワークスペースのメンバーです");
@@ -216,11 +225,13 @@ export async function updateMentorAccess(
     assertMentor(user);
     assertCanManageAccess(user);
 
-    const mentor = await prisma.user.findFirst({
-      where: { id: mentorUserId, tenantId: user.tenantId, role: { not: "STUDENT" } },
-      select: { id: true, email: true }
+    // このワークスペースへの所属(membership)を確認する
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId: mentorUserId, tenantId: user.tenantId },
+      include: { user: { select: { id: true, email: true, tenantId: true } } }
     });
-    if (!mentor) throw new ValidationError("対象の講師が見つかりません");
+    if (!membership) throw new ValidationError("対象の講師が見つかりません");
+    const mentor = membership.user;
 
     // オーナー自身のアクセス範囲は変更不可（常にフルアクセス）
     if (mentor.email === user.tenant?.ownerEmail) {
@@ -246,8 +257,12 @@ export async function updateMentorAccess(
     }
 
     await prisma.$transaction([
-      prisma.user.update({ where: { id: mentor.id }, data: { hasFullTenantAccess: access.grantFullAccess } }),
-      prisma.studentMentorAccess.deleteMany({ where: { userId: mentor.id } }),
+      // このワークスペースの所属(membership)のアクセス範囲を更新
+      prisma.tenantMembership.update({ where: { id: membership.id }, data: { hasFullTenantAccess: access.grantFullAccess } }),
+      // このワークスペースの生徒に対する既存割当だけを削除（他塾の割当は温存）
+      prisma.studentMentorAccess.deleteMany({
+        where: { userId: mentor.id, studentProfile: { tenantId: user.tenantId } }
+      }),
       ...(studentIds.length > 0
         ? [
             prisma.studentMentorAccess.createMany({
@@ -255,6 +270,10 @@ export async function updateMentorAccess(
               skipDuplicates: true
             })
           ]
+        : []),
+      // 対象講師のアクティブ塾がこのワークスペースなら、User側のキャッシュも同期
+      ...(mentor.tenantId === user.tenantId
+        ? [prisma.user.update({ where: { id: mentor.id }, data: { hasFullTenantAccess: access.grantFullAccess } })]
         : [])
     ]);
 

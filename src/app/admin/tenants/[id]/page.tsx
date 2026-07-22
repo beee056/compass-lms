@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, GraduationCap, ShieldCheck, UsersRound } from "lucide-react";
 import { getCurrentUser } from "@/lib/actions";
-import { getAdminTenantDetail } from "@/lib/actions/admin";
+import { getAdminTenantDetail, getAdminTenantMembers } from "@/lib/actions/admin";
+import AdminTenantMembers from "@/components/admin/AdminTenantMembers";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,12 @@ export default async function AdminTenantDetailPage({ params }: { params: { id: 
   const { tenant } = await getAdminTenantDetail(params.id);
   if (!tenant) notFound();
 
+  const memberData = await getAdminTenantMembers(params.id);
+
   const formatDate = (value: string | null) =>
     value
       ? new Date(value).toLocaleDateString("ja-JP", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Tokyo" })
       : "-";
-  const mentors = tenant.users.filter((member: any) => member.role !== "STUDENT");
 
   return (
     <div className="w-full animate-in fade-in duration-500 pb-20">
@@ -53,24 +55,16 @@ export default async function AdminTenantDetailPage({ params }: { params: { id: 
           <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="flex items-center gap-2 text-base font-black text-slate-800">
               <UsersRound className="h-5 w-5 text-indigo-500" />
-              メンター（{mentors.length}名）
+              メンター（{memberData.members.length}名）
             </h2>
+            <p className="mt-1 text-xs font-medium text-slate-500">運営者として、この塾のメンターを追加・削除・権限変更できます。</p>
           </div>
-          <div className="divide-y divide-slate-100">
-            {mentors.map((mentor: any) => (
-              <div key={mentor.id} className="px-5 py-3">
-                <p className="text-sm font-bold text-slate-800">
-                  {mentor.name}
-                  {mentor.isOperator && (
-                    <span className="ml-2 rounded-sm bg-indigo-50 px-1.5 py-0.5 text-[10px] font-black text-indigo-600">運営者</span>
-                  )}
-                </p>
-                <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                  {mentor.email} / 登録 {formatDate(mentor.createdAt)}
-                </p>
-              </div>
-            ))}
-          </div>
+          <AdminTenantMembers
+            tenantId={tenant.id}
+            members={memberData.members as any[]}
+            students={memberData.students as any[]}
+            pendingInvites={memberData.pendingInvites as any[]}
+          />
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white">

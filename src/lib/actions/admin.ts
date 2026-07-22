@@ -411,6 +411,83 @@ export async function adminRemoveMember(tenantId: string, mentorUserId: string) 
   }
 }
 
+// 全メンター名簿（塾横断）。未割当（どの塾にも実所属していない）メンターも一覧できる。
+export async function getAdminMentorDirectory() {
+  try {
+    const user = await getCurrentUser();
+    assertOperator(user);
+
+    const [users, tenants] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: { not: "STUDENT" } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          isOperator: true,
+          memberships: {
+            select: {
+              tenantId: true,
+              hasFullTenantAccess: true,
+              tenant: { select: { id: true, name: true, ownerEmail: true, _count: { select: { students: true } } } }
+            }
+          }
+        }
+      }),
+      prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, status: true } })
+    ]);
+
+    const mentors = users.map((u) => {
+      const email = u.email.toLowerCase();
+      const memberTenants = u.memberships.map((m) => ({
+        tenantId: m.tenantId,
+        tenantName: m.tenant.name,
+        isOwner: !!m.tenant.ownerEmail && m.tenant.ownerEmail.toLowerCase() === email,
+        hasFullTenantAccess: m.hasFullTenantAccess,
+        studentCount: m.tenant._count.students
+      }));
+      const realAssignments = memberTenants.filter((t) => !t.isOwner);
+      const ownedWithStudents = memberTenants.filter((t) => t.isOwner && t.studentCount > 0);
+      const isUnassigned = realAssignments.length === 0 && ownedWithStudents.length === 0;
+      return { userId: u.id, name: u.name, email: u.email, isOperator: u.isOperator, tenants: memberTenants, isUnassigned };
+    });
+
+    return { success: true, mentors: JSON.parse(JSON.stringify(mentors)), tenants: JSON.parse(JSON.stringify(tenants)) };
+  } catch (error) {
+    console.error("Failed to get mentor directory (admin):", error);
+    return { success: false, mentors: [], tenants: [], error: toClientError(error, "メンター名簿の取得に失敗しました") };
+  }
+}
+
+// 名簿から既存メンターを任意の塾へ割り当て（フルアクセス。細かい生徒割当は塾詳細で調整）。
+export async function adminAssignMentor(userId: string, tenantId: string) {
+  try {
+    const user = await getCurrentUser();
+    assertOperator(user);
+
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, email: true } });
+    if (!target) throw new ValidationError("対象のメンターが見つかりません");
+    if (target.role === "STUDENT") throw new ValidationError("生徒アカウントは割り当てできません");
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true, name: true } });
+    if (!tenant) throw new ValidationError("塾が見つかりません");
+
+    await prisma.tenantMembership.upsert({
+      where: { userId_tenantId: { userId, tenantId } },
+      create: { userId, tenantId, hasFullTenantAccess: true },
+      update: {}
+    });
+    await logOperatorAction(tenantId, user.email, `メンター ${target.email} を割り当て（フルアクセス）`);
+    revalidatePath("/admin/mentors");
+    revalidatePath(`/admin/tenants/${tenantId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to assign mentor (admin):", error);
+    return { success: false, error: toClientError(error, "割り当てに失敗しました") };
+  }
+}
+
 export async function adminRevokeInvite(tenantId: string, inviteId: string) {
   try {
     const user = await getCurrentUser();

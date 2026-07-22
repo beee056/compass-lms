@@ -330,6 +330,12 @@ export async function updateTenantSettings(formData: FormData) {
 
     const name = validateText(formData.get("name") as string, "ワークスペース名", 100);
 
+    // クロステナント: 他人の塾を改名できないよう、リネームはオーナーのみに制限する
+    const tenant = await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { ownerEmail: true } });
+    if (tenant?.ownerEmail && tenant.ownerEmail.toLowerCase() !== user.email.toLowerCase()) {
+      throw new ValidationError("ワークスペース名を変更できるのはオーナーのみです");
+    }
+
     await prisma.tenant.update({
       where: { id: user.tenantId },
       data: { name }

@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createTenantInvite, revokeTenantInvite, updateMentorAccess } from "@/lib/actions/tenant-invites";
+import { createTenantInvite, revokeTenantInvite, updateMentorAccess, removeMember } from "@/lib/actions/tenant-invites";
 
 interface Invite {
   id: string;
@@ -24,6 +24,8 @@ interface Mentor {
   email: string;
   hasFullTenantAccess: boolean;
   assignedStudentIds: string[];
+  isOwner?: boolean;
+  isSelf?: boolean;
 }
 interface StudentOption {
   id: string;
@@ -119,6 +121,21 @@ export default function MentorInviteManager({
         router.refresh();
       } else {
         toast.error(result.error ?? "取り消しに失敗しました");
+      }
+    });
+  }
+
+  function handleRemove(m: Mentor) {
+    if (!window.confirm(`${m.name} さんをこのワークスペースから外しますか？\n（このワークスペースでの担当生徒の割当は解除されます。再度招待すれば戻せます）`)) return;
+    setBusyId(m.id);
+    startTransition(async () => {
+      const result = await removeMember(m.id);
+      setBusyId(null);
+      if (result.success) {
+        toast.success("メンバーをワークスペースから外しました");
+        router.refresh();
+      } else {
+        toast.error(result.error ?? "削除に失敗しました");
       }
     });
   }
@@ -242,6 +259,12 @@ export default function MentorInviteManager({
                         {m.assignedStudentIds.length}名のみ
                       </span>
                     )}
+                    {m.isOwner && (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">オーナー</span>
+                    )}
+                    {m.isSelf && !m.isOwner && (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">あなた</span>
+                    )}
                     {canManageAccess && (
                       <button
                         onClick={() => (isEditing ? setEditingMentorId(null) : openEditAccess(m))}
@@ -249,6 +272,16 @@ export default function MentorInviteManager({
                         title="アクセス範囲を編集"
                       >
                         <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canManageAccess && !m.isOwner && !m.isSelf && (
+                      <button
+                        onClick={() => handleRemove(m)}
+                        disabled={busyId === m.id}
+                        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                        title="ワークスペースから外す"
+                      >
+                        {busyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
                       </button>
                     )}
                   </span>

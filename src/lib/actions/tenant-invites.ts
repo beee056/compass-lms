@@ -78,7 +78,9 @@ export async function getTenantInvites() {
             name: m.name,
             email: m.email,
             hasFullTenantAccess: m.hasFullTenantAccess,
-            assignedStudentIds: m.studentAccess.map((a) => a.studentProfileId)
+            assignedStudentIds: m.studentAccess.map((a) => a.studentProfileId),
+            isOwner: !!user.tenant?.ownerEmail && m.email.toLowerCase() === user.tenant.ownerEmail.toLowerCase(),
+            isSelf: m.id === user.id
           }))
         )
       ),
@@ -282,5 +284,63 @@ export async function updateMentorAccess(
   } catch (error) {
     console.error("Failed to update mentor access:", error);
     return { success: false, error: toClientError(error, "アクセス範囲の更新に失敗しました") };
+  }
+}
+
+// 参加済みメンターをこのワークスペースから外す（membership を解除）。
+// - オーナー・自分自身は外せない
+// - 対象の最後の所属は外せない（所属ゼロ状態を作らない）
+// - このワークスペースの生徒割当のみ解除（他塾の割当は温存）。アクティブ塾なら残る所属へ付け替える
+export async function removeMember(mentorUserId: string) {
+  try {
+    const user = await getCurrentUser();
+    assertMentor(user);
+    assertCanManageAccess(user);
+
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId: mentorUserId, tenantId: user.tenantId },
+      include: { user: { select: { id: true, email: true, tenantId: true } } }
+    });
+    if (!membership) throw new ValidationError("対象の講師が見つかりません");
+    const target = membership.user;
+
+    if (target.email === user.tenant?.ownerEmail) {
+      throw new ValidationError("オーナーはワークスペースから外せません");
+    }
+    if (target.id === user.id) {
+      throw new ValidationError("自分自身は外せません");
+    }
+
+    const totalMemberships = await prisma.tenantMembership.count({ where: { userId: mentorUserId } });
+    if (totalMemberships <= 1) {
+      throw new ValidationError("この講師の最後の所属のため外せません（先に別のワークスペースへ参加させてください）");
+    }
+
+    // アクティブ塾がこのワークスペースなら、残る所属へ付け替える（getCurrentUser の再作成を防ぐ）
+    const otherMembership = await prisma.tenantMembership.findFirst({
+      where: { userId: mentorUserId, tenantId: { not: user.tenantId } },
+      orderBy: { createdAt: "asc" }
+    });
+
+    await prisma.$transaction([
+      prisma.tenantMembership.delete({ where: { id: membership.id } }),
+      prisma.studentMentorAccess.deleteMany({
+        where: { userId: mentorUserId, studentProfile: { tenantId: user.tenantId } }
+      }),
+      ...(target.tenantId === user.tenantId && otherMembership
+        ? [
+            prisma.user.update({
+              where: { id: mentorUserId },
+              data: { tenantId: otherMembership.tenantId, hasFullTenantAccess: otherMembership.hasFullTenantAccess }
+            })
+          ]
+        : [])
+    ]);
+
+    revalidatePath("/settings");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to remove member:", error);
+    return { success: false, error: toClientError(error, "メンバーの削除に失敗しました") };
   }
 }

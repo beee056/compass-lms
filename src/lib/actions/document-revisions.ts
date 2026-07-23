@@ -7,6 +7,7 @@ import { getCurrentUser } from "../actions";
 import { getAIModel } from "../ai-model";
 import { buildSelfProfileContext } from "../self-profile-fields";
 import { assertActiveTenant, assertMentor, findAuthorizedDocument, toClientError, ValidationError } from "../authz";
+import { assertAiQuota, consumeAiCredit, QuotaExceededError } from "../billing";
 import { Prisma } from "@prisma/client";
 
 function revalidateDocument(studentId: string, documentId: string) {
@@ -67,6 +68,7 @@ export async function reviewDocumentWithAI(documentId: string, content: string) 
   try {
     const user = await getCurrentUser();
     await assertActiveTenant(user);
+    await assertAiQuota(user);
     const document = await findAuthorizedDocument(user, documentId);
     if (!content.trim()) throw new ValidationError("AI添削する原稿を入力してください");
 
@@ -81,9 +83,11 @@ export async function reviewDocumentWithAI(documentId: string, content: string) 
     });
 
     await prisma.documentAIReview.create({ data: { revisionId: revision.id, feedback: text, createdByUserId: user.id } });
+    await consumeAiCredit(user.tenantId);
     revalidateDocument(document.studentProfileId, document.id);
     return { success: true, revisionNumber: revision.revisionNumber };
   } catch (error) {
+    if (error instanceof QuotaExceededError) return { success: false, quotaExceeded: true, error: error.message };
     return { success: false, error: toClientError(error, "AI添削に失敗しました") };
   }
 }

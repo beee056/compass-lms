@@ -66,6 +66,9 @@ export default function DocumentEditor({
       if (result.success) {
         toast.success(`第${result.revisionNumber}稿のAI添削が完了しました`);
         router.refresh();
+      } else if ((result as { quotaExceeded?: boolean }).quotaExceeded) {
+        toast.error(result.error);
+        router.push("/upgrade");
       } else toast.error(result.error);
     });
   };

@@ -362,6 +362,9 @@ export default function PracticeSection({
         if (!useInstant || savedQuestion) {
           router.refresh();
         }
+      } else if ((result as any).quotaExceeded) {
+        setError(result.error ?? "無料の添削回数を使い切りました");
+        router.push("/upgrade");
       } else {
         setError(result.error ?? "添削に失敗しました");
       }

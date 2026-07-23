@@ -7,6 +7,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { getCurrentUser } from "../actions";
 import { assertActiveTenant, assertMentor, assertStudentAccess, toClientError, ValidationError } from "../authz";
+import { assertAiQuota, consumeAiCredit, QuotaExceededError } from "../billing";
 import { getAIModel } from "../ai-model";
 import {
   RUBRICS,
@@ -118,6 +119,9 @@ async function runRubricEvaluation(
     ) {
       throw new ValidationError(`規定字数は50〜${MAX_ANSWER_CHARS}字で指定してください`);
     }
+
+    // 無料枠（生涯5回）の確認。超過なら QuotaExceededError で停止する
+    await assertAiQuota(user);
 
     const rubric = RUBRICS[kind];
     const selectedQuestion = options?.questionId
@@ -490,6 +494,7 @@ ${selfProfileContext ? `\n${selfProfileContext}` : ""}
       checklist: (evaluation as any).checklist ?? null
     };
 
+    await consumeAiCredit(user.tenantId);
     return { authoritativePromptText, totalScore, feedbackPayload };
 }
 
@@ -617,6 +622,7 @@ export async function evaluateWithRubric(
     };
   } catch (error: any) {
     console.error("AI Evaluation failed:", error);
+    if (error instanceof QuotaExceededError) return { success: false, quotaExceeded: true, error: error.message };
     return { success: false, error: toClientError(error, "添削の実行に失敗しました。時間をおいて再度お試しください") };
   }
 }
@@ -725,6 +731,7 @@ export async function evaluatePracticeInstant(params: {
     };
   } catch (error: any) {
     console.error("Instant AI Evaluation failed:", error);
+    if (error instanceof QuotaExceededError) return { success: false, quotaExceeded: true, error: error.message };
     return { success: false, error: toClientError(error, "添削の実行に失敗しました。時間をおいて再度お試しください") };
   }
 }

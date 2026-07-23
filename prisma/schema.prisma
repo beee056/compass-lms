@@ -15,6 +15,10 @@ model Tenant {
   status           String           @default("ACTIVE")
   approvedAt       DateTime?
   approvedByUserId String?
+  // 課金プラン。FREE(生涯5回) / STANDARD / PRO
+  plan             String           @default("FREE")
+  // 生涯のAI添削・採点回数（無料枠の判定用。プラン別の月次上限は将来別途）
+  aiUsageCount     Int              @default(0)
   // Clerk→Better Auth 移行用: 再登録時に既存ワークスペースを再取得するためのオーナーメール。
   // 一意制約により、並行プロビジョニング時のテナント重複作成を防ぐ（1オーナー=1ワークスペース）
   ownerEmail       String?          @unique
@@ -26,6 +30,19 @@ model Tenant {
   logs             ActivityLog[]
   invites          TenantInvite[]
   memberships      TenantMembership[]
+  waitlist         BillingWaitlist?
+}
+
+// 有料プランのウェイティングリスト（先行登録）。塾ごとに1件。
+model BillingWaitlist {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedPlan String // STANDARD / PRO / ANY
+  email         String
+  note          String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // テナント（塾）へのメンター招待。招待メールで登録すると同じワークスペースに参加する。

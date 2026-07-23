@@ -29,6 +29,22 @@ async function logOperatorAction(tenantId: string, operatorEmail: string, detail
   });
 }
 
+// 未割当メンター（アクティブ塾が自分の空の個人ワークスペース）を割り当てたとき、
+// アクティブ塾を割り当て先へ自動で切り替える。既に実塾で作業中の人は切り替えない。
+async function activateIfPersonalShell(userId: string, email: string, targetTenantId: string, hasFullAccess: boolean) {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { tenantId: true } });
+  if (!u?.tenantId || u.tenantId === targetTenantId) return;
+  const cur = await prisma.tenant.findUnique({
+    where: { id: u.tenantId },
+    select: { ownerEmail: true, _count: { select: { students: true } } }
+  });
+  const isPersonalShell =
+    !!cur && !!cur.ownerEmail && cur.ownerEmail.toLowerCase() === email.toLowerCase() && cur._count.students === 0;
+  if (isPersonalShell) {
+    await prisma.user.update({ where: { id: userId }, data: { tenantId: targetTenantId, hasFullTenantAccess: hasFullAccess } });
+  }
+}
+
 export async function getAdminTenantList() {
   try {
     const user = await getCurrentUser();
@@ -107,6 +123,7 @@ export async function getAdminTenantDetail(tenantId: string) {
             name: true,
             grade: true,
             status: true,
+            userId: true,
             updatedAt: true,
             universities: { select: { name: true, department: true }, take: 2 },
             _count: { select: { practiceRecords: true, documents: true, tasks: true } }
@@ -282,6 +299,7 @@ export async function adminAddMentorToTenant(
           });
         }
       });
+      await activateIfPersonalShell(existing.id, normalized, tenantId, access.grantFullAccess);
       await logOperatorAction(tenantId, user.email, `メンター ${normalized} を追加（${access.grantFullAccess ? "フルアクセス" : `${studentIds.length}名`}）`);
       revalidatePath(`/admin/tenants/${tenantId}`);
       return { success: true, mode: "added" as const };
@@ -478,6 +496,7 @@ export async function adminAssignMentor(userId: string, tenantId: string) {
       create: { userId, tenantId, hasFullTenantAccess: true },
       update: {}
     });
+    await activateIfPersonalShell(userId, target.email, tenantId, true);
     await logOperatorAction(tenantId, user.email, `メンター ${target.email} を割り当て（フルアクセス）`);
     revalidatePath("/admin/mentors");
     revalidatePath(`/admin/tenants/${tenantId}`);
@@ -485,6 +504,59 @@ export async function adminAssignMentor(userId: string, tenantId: string) {
   } catch (error) {
     console.error("Failed to assign mentor (admin):", error);
     return { success: false, error: toClientError(error, "割り当てに失敗しました") };
+  }
+}
+
+// 生徒アカウントをメンターへ転換（卒業生が講師になるケース）。
+// 生徒プロフィールは卒業アーカイブしてログインを外し（学習データは塾に残す）、
+// 本人には個人ワークスペースを用意して「未割当メンター」にする。デフォルト挙動は変えない（手動転換のみ）。
+export async function adminConvertStudentToMentor(userId: string) {
+  try {
+    const user = await getCurrentUser();
+    assertOperator(user);
+
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, email: true, name: true, studentProfile: { select: { id: true, tenantId: true } } }
+    });
+    if (!target) throw new ValidationError("対象のアカウントが見つかりません");
+    if (target.role !== "STUDENT") throw new ValidationError("この操作は生徒アカウントにのみ行えます");
+
+    const studentProfile = target.studentProfile;
+    const existingOwn = await prisma.tenant.findFirst({ where: { ownerEmail: target.email }, select: { id: true } });
+    let ownTenantId = existingOwn?.id ?? null;
+
+    await prisma.$transaction(async (tx) => {
+      if (studentProfile) {
+        await tx.studentProfile.update({ where: { id: studentProfile.id }, data: { userId: null, status: "ARCHIVED" } });
+      }
+      if (!ownTenantId) {
+        const created = await tx.tenant.create({
+          data: {
+            id: `tenant-${randomUUID()}`,
+            name: `${target.name || "メンター"}のワークスペース`,
+            status: process.env.TENANT_AUTO_APPROVE === "true" ? "ACTIVE" : "PENDING",
+            ownerEmail: target.email
+          }
+        });
+        ownTenantId = created.id;
+      }
+      const finalTenantId = ownTenantId as string;
+      await tx.user.update({ where: { id: userId }, data: { role: "MENTOR", tenantId: finalTenantId, hasFullTenantAccess: true } });
+      await tx.tenantMembership.upsert({
+        where: { userId_tenantId: { userId, tenantId: finalTenantId } },
+        create: { userId, tenantId: finalTenantId, hasFullTenantAccess: true },
+        update: {}
+      });
+    });
+
+    await logOperatorAction(studentProfile?.tenantId ?? (ownTenantId as string), user.email, `生徒 ${target.email} をメンターへ転換`);
+    revalidatePath("/admin/mentors");
+    if (studentProfile?.tenantId) revalidatePath(`/admin/tenants/${studentProfile.tenantId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to convert student to mentor (admin):", error);
+    return { success: false, error: toClientError(error, "メンターへの転換に失敗しました") };
   }
 }
 

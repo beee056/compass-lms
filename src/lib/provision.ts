@@ -1,5 +1,30 @@
 import { randomUUID } from "crypto";
 import prisma from "./prisma";
+import { sendAuthEmail } from "./auth-email";
+
+// 新規ワークスペースが承認待ちになったら運営者へメール通知（ベストエフォート）。
+async function notifyOperatorsOfPendingTenant(tenantName: string, ownerEmail: string, ownerName: string | null) {
+  const operatorEmails = (process.env.OPERATOR_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (operatorEmails.length === 0) return;
+  const appUrl = process.env.BETTER_AUTH_URL || "https://compass.p-quest.com";
+  for (const to of operatorEmails) {
+    try {
+      await sendAuthEmail({
+        to,
+        subject: `【Scholar Compass】承認待ち: ${tenantName}`,
+        heading: "新しいワークスペースが承認待ちです",
+        body: `${ownerName || ownerEmail} さん（${ownerEmail}）が新しいワークスペース「${tenantName}」を作成しました。運営コンソールから承認できます。`,
+        actionLabel: "運営コンソールで承認する",
+        actionUrl: `${appUrl}/admin`
+      });
+    } catch (mailError) {
+      console.error("operator notify mail failed:", mailError);
+    }
+  }
+}
 
 // テナントが「乗り換えても安全な抜け殻」かどうかを判定する。
 // 対象ユーザー以外の所属(membership)・利用者が無く、生徒データも無い場合のみ true。
@@ -147,6 +172,9 @@ export async function provisionUser(input: { id: string; email: string; name?: s
     await prisma.tenantMembership.create({
       data: { userId: id, tenantId: tenant.id, hasFullTenantAccess: true }
     });
+    if (tenant.status === "PENDING") {
+      await notifyOperatorsOfPendingTenant(tenant.name, email, input.name ?? null);
+    }
   } catch (error: unknown) {
     // 並行実行で別リクエストが先に作成した場合（ownerEmail一意制約違反）は、既存を再取得
     const existing = await prisma.tenant.findFirst({ where: { ownerEmail: email }, select: { id: true } });

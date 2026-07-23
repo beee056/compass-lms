@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, GraduationCap, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowLeft, GraduationCap, ShieldCheck, UsersRound, FileSpreadsheet } from "lucide-react";
 import { getCurrentUser } from "@/lib/actions";
 import { getAdminTenantDetail, getAdminTenantMembers } from "@/lib/actions/admin";
 import AdminTenantMembers from "@/components/admin/AdminTenantMembers";
@@ -48,6 +48,10 @@ export default async function AdminTenantDetailPage({ params }: { params: { id: 
             状態: {STATUS_LABEL[tenant.status] ?? tenant.status} / 登録: {formatDate(tenant.createdAt)}
             {tenant.approvedAt ? ` / 承認: ${formatDate(tenant.approvedAt)}` : ""} / 直近30日のAI添削: {tenant.practiceCount30d}回
           </p>
+          <Link href={`/admin/tenants/${tenant.id}/import`} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            データ取込（代行）
+          </Link>
         </div>
       </div>
 

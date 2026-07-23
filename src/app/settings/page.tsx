@@ -53,6 +53,18 @@ export default async function SettingsPage() {
           </span>
           <span className="text-sm font-bold text-indigo-600">開く →</span>
         </Link>
+        <Link
+          href="/import"
+          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-indigo-300"
+        >
+          <span>
+            <span className="block text-base font-black text-slate-800">データ取込（スプレッドシートから引っ越し）</span>
+            <span className="mt-1 block text-sm font-medium text-slate-500">
+              生徒・志望校・書類をCSV／貼り付けでまとめて取り込みます。
+            </span>
+          </span>
+          <span className="text-sm font-bold text-indigo-600">開く →</span>
+        </Link>
       </div>
 
       <SettingsTabs tenant={tenant} templates={templates} />

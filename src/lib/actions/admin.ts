@@ -6,6 +6,7 @@ import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
 import { assertOperator, toClientError, ValidationError } from "../authz";
 import { sendAuthEmail } from "../auth-email";
+import { ensurePersonalWorkspaceTx } from "../memberships";
 
 // -----------------------------------------------------------------------------
 // 運営者コンソール専用アクション
@@ -394,7 +395,7 @@ export async function adminRemoveMember(tenantId: string, mentorUserId: string) 
 
     const membership = await prisma.tenantMembership.findFirst({
       where: { userId: mentorUserId, tenantId },
-      include: { user: { select: { id: true, email: true, tenantId: true } } }
+      include: { user: { select: { id: true, name: true, email: true, tenantId: true } } }
     });
     if (!membership) throw new ValidationError("対象のメンバーが見つかりません");
 
@@ -403,24 +404,27 @@ export async function adminRemoveMember(tenantId: string, mentorUserId: string) 
       throw new ValidationError("オーナーはワークスペースから外せません");
     }
 
-    const totalMemberships = await prisma.tenantMembership.count({ where: { userId: mentorUserId } });
-    if (totalMemberships <= 1) {
-      throw new ValidationError("この講師の最後の所属のため外せません（先に別のワークスペースへ参加させてください）");
-    }
-
+    const target = membership.user;
     const otherMembership = await prisma.tenantMembership.findFirst({
       where: { userId: mentorUserId, tenantId: { not: tenantId } },
       orderBy: { createdAt: "asc" }
     });
 
-    await prisma.$transaction([
-      prisma.tenantMembership.delete({ where: { id: membership.id } }),
-      prisma.studentMentorAccess.deleteMany({ where: { userId: mentorUserId, studentProfile: { tenantId } } }),
-      ...(membership.user.tenantId === tenantId && otherMembership
-        ? [prisma.user.update({ where: { id: mentorUserId }, data: { tenantId: otherMembership.tenantId, hasFullTenantAccess: otherMembership.hasFullTenantAccess } })]
-        : [])
-    ]);
-    await logOperatorAction(tenantId, user.email, `メンター ${membership.user.email} を外した`);
+    await prisma.$transaction(async (tx) => {
+      // 移動先の所属を決める。無ければ個人ワークスペースへフォールバック（未割当メンター化）
+      let fallbackTenantId = otherMembership?.tenantId ?? null;
+      let fallbackFull = otherMembership?.hasFullTenantAccess ?? true;
+      if (!fallbackTenantId) {
+        fallbackTenantId = await ensurePersonalWorkspaceTx(tx, { userId: mentorUserId, email: target.email, name: target.name });
+        fallbackFull = true;
+      }
+      await tx.tenantMembership.delete({ where: { id: membership.id } });
+      await tx.studentMentorAccess.deleteMany({ where: { userId: mentorUserId, studentProfile: { tenantId } } });
+      if (target.tenantId === tenantId) {
+        await tx.user.update({ where: { id: mentorUserId }, data: { tenantId: fallbackTenantId, hasFullTenantAccess: fallbackFull } });
+      }
+    });
+    await logOperatorAction(tenantId, user.email, `メンター ${target.email} を外した`);
     revalidatePath(`/admin/tenants/${tenantId}`);
     return { success: true };
   } catch (error) {
@@ -435,7 +439,7 @@ export async function getAdminMentorDirectory() {
     const user = await getCurrentUser();
     assertOperator(user);
 
-    const [users, tenants] = await Promise.all([
+    const [users, allTenants] = await Promise.all([
       prisma.user.findMany({
         where: { role: { not: "STUDENT" } },
         orderBy: { createdAt: "asc" },
@@ -453,18 +457,43 @@ export async function getAdminMentorDirectory() {
           }
         }
       }),
-      prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, status: true } })
+      prisma.tenant.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, status: true, ownerEmail: true, _count: { select: { students: true } } }
+      })
     ]);
+
+    const tenants = allTenants.map((t) => ({ id: t.id, name: t.name, status: t.status }));
+
+    // 所有塾をメール別に索引（membership 行が未作成でもオーナーの塾を表示するため）
+    const ownedByEmail = new Map<string, typeof allTenants>();
+    for (const t of allTenants) {
+      if (!t.ownerEmail) continue;
+      const key = t.ownerEmail.toLowerCase();
+      const arr = ownedByEmail.get(key);
+      if (arr) arr.push(t);
+      else ownedByEmail.set(key, [t]);
+    }
 
     const mentors = users.map((u) => {
       const email = u.email.toLowerCase();
-      const memberTenants = u.memberships.map((m) => ({
-        tenantId: m.tenantId,
-        tenantName: m.tenant.name,
-        isOwner: !!m.tenant.ownerEmail && m.tenant.ownerEmail.toLowerCase() === email,
-        hasFullTenantAccess: m.hasFullTenantAccess,
-        studentCount: m.tenant._count.students
-      }));
+      const map = new Map<string, { tenantId: string; tenantName: string; isOwner: boolean; hasFullTenantAccess: boolean; studentCount: number }>();
+      for (const m of u.memberships) {
+        map.set(m.tenantId, {
+          tenantId: m.tenantId,
+          tenantName: m.tenant.name,
+          isOwner: !!m.tenant.ownerEmail && m.tenant.ownerEmail.toLowerCase() === email,
+          hasFullTenantAccess: m.hasFullTenantAccess,
+          studentCount: m.tenant._count.students
+        });
+      }
+      // membership 行が無いオーナー所有塾も補完（自己修復の反映遅れ対策）
+      for (const t of ownedByEmail.get(email) ?? []) {
+        if (!map.has(t.id)) {
+          map.set(t.id, { tenantId: t.id, tenantName: t.name, isOwner: true, hasFullTenantAccess: true, studentCount: t._count.students });
+        }
+      }
+      const memberTenants = Array.from(map.values());
       const realAssignments = memberTenants.filter((t) => !t.isOwner);
       const ownedWithStudents = memberTenants.filter((t) => t.isOwner && t.studentCount > 0);
       const isUnassigned = realAssignments.length === 0 && ownedWithStudents.length === 0;

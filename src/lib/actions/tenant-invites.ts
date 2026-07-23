@@ -6,6 +6,7 @@ import prisma from "../prisma";
 import { getCurrentUser } from "../actions";
 import { assertMentor, getRestrictedStudentIds, toClientError, AuthorizationError, ValidationError } from "../authz";
 import { sendAuthEmail } from "../auth-email";
+import { ensurePersonalWorkspaceTx } from "../memberships";
 
 // テナント（塾）へのメンター招待。
 // 招待されたメールでサインアップすると、provisionUser が同じワークスペースへ参加させる。
@@ -289,8 +290,8 @@ export async function updateMentorAccess(
 
 // 参加済みメンターをこのワークスペースから外す（membership を解除）。
 // - オーナー・自分自身は外せない
-// - 対象の最後の所属は外せない（所属ゼロ状態を作らない）
-// - このワークスペースの生徒割当のみ解除（他塾の割当は温存）。アクティブ塾なら残る所属へ付け替える
+// - このワークスペースの生徒割当のみ解除（他塾の割当は温存）
+// - 最後の所属だった場合は個人ワークスペースへフォールバック（未割当メンター化）
 export async function removeMember(mentorUserId: string) {
   try {
     const user = await getCurrentUser();
@@ -299,7 +300,7 @@ export async function removeMember(mentorUserId: string) {
 
     const membership = await prisma.tenantMembership.findFirst({
       where: { userId: mentorUserId, tenantId: user.tenantId },
-      include: { user: { select: { id: true, email: true, tenantId: true } } }
+      include: { user: { select: { id: true, name: true, email: true, tenantId: true } } }
     });
     if (!membership) throw new ValidationError("対象の講師が見つかりません");
     const target = membership.user;
@@ -311,31 +312,24 @@ export async function removeMember(mentorUserId: string) {
       throw new ValidationError("自分自身は外せません");
     }
 
-    const totalMemberships = await prisma.tenantMembership.count({ where: { userId: mentorUserId } });
-    if (totalMemberships <= 1) {
-      throw new ValidationError("この講師の最後の所属のため外せません（先に別のワークスペースへ参加させてください）");
-    }
-
-    // アクティブ塾がこのワークスペースなら、残る所属へ付け替える（getCurrentUser の再作成を防ぐ）
     const otherMembership = await prisma.tenantMembership.findFirst({
       where: { userId: mentorUserId, tenantId: { not: user.tenantId } },
       orderBy: { createdAt: "asc" }
     });
 
-    await prisma.$transaction([
-      prisma.tenantMembership.delete({ where: { id: membership.id } }),
-      prisma.studentMentorAccess.deleteMany({
-        where: { userId: mentorUserId, studentProfile: { tenantId: user.tenantId } }
-      }),
-      ...(target.tenantId === user.tenantId && otherMembership
-        ? [
-            prisma.user.update({
-              where: { id: mentorUserId },
-              data: { tenantId: otherMembership.tenantId, hasFullTenantAccess: otherMembership.hasFullTenantAccess }
-            })
-          ]
-        : [])
-    ]);
+    await prisma.$transaction(async (tx) => {
+      let fallbackTenantId = otherMembership?.tenantId ?? null;
+      let fallbackFull = otherMembership?.hasFullTenantAccess ?? true;
+      if (!fallbackTenantId) {
+        fallbackTenantId = await ensurePersonalWorkspaceTx(tx, { userId: mentorUserId, email: target.email, name: target.name });
+        fallbackFull = true;
+      }
+      await tx.tenantMembership.delete({ where: { id: membership.id } });
+      await tx.studentMentorAccess.deleteMany({ where: { userId: mentorUserId, studentProfile: { tenantId: user.tenantId } } });
+      if (target.tenantId === user.tenantId) {
+        await tx.user.update({ where: { id: mentorUserId }, data: { tenantId: fallbackTenantId, hasFullTenantAccess: fallbackFull } });
+      }
+    });
 
     revalidatePath("/settings");
     return { success: true };
